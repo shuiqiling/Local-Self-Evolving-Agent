@@ -1,0 +1,2758 @@
+﻿本地自进化 Agent 认知架构
+从“记忆”到“经验”，再到“微量参数固化”的持续学习方案
+版本 v2.1 · 对话发展完整汇总版
+一句话定义 / 构建一个低算力、本地运行、长期存在的具身自进化 Agent：底层持续感知和控制，视觉与传感器只增量更新世界模型，高层 LLM 只在有意义的变化出现时被唤醒；一次经历先进入外部记忆，重复经历形成经验，稳定经验再通过 LoRA/Adapter 缓慢固化为模型倾向。
+
+核心目标
+保持本地模型推理轻量、上下文短、首 Token 响应快。
+把“经历”先沉淀为可检索的外部记忆，再逐渐提炼为稳定经验。
+只有通过验证的稳定经验，才进入参数更新，避免噪声经验污染模型。
+基础模型尽量冻结，长期变化优先沉淀在可回滚、可调强度的 LoRA/Adapter 中。
+
+1. 原始设想与整理后的核心原则
+原始设想包含四个方向：短期上下文窗口、分层记忆、自我进化、以及为 Agent 自行编写工具/经验机制。整理后，可以将它们统一成一个“多时间尺度学习系统”。
+原则	说明
+---	---
+短上下文优先	大任务拆成阶段，每个阶段只保留当前 Goal、Plan、State、关键观察与最近动作；任务结束后释放大部分工作记忆。
+KV Cache 是加速层，不等于记忆本体	KV Cache 用于复用稳定前缀和当前工作上下文的计算结果；真正的短期记忆仍由结构化 Working Memory 表示。
+经验先外置，再参数化	一次经历先保存为 Episodic Memory；多次相似经历验证后提炼成 Experience；只有稳定、高置信度经验才进入训练缓冲区。
+微量改权重，而不是重写模型	Base Model 尽量保持冻结；长期经验优先通过 LoRA/Adapter 形成小的参数偏移，并允许回滚、衰减和合并。
+结果导向，但不盲目搜索	通过 Reward/Critic 评价结果；探索时优先使用受限候选、Beam/分支搜索，而不是对整个动作空间做无界 BFS。
+
+2. 总体架构
+整个系统可以拆成“执行闭环”和“学习闭环”两条链路：前者追求实时与低延迟，后者追求稳定与长期积累。
+用户 / 环境	产生目标、输入、传感器状态或任务
+---	---
+Working Memory	保存当前 Goal / Plan / State / 最近动作；尽量短
+Local LLM = Base + Adapter	负责推理、规划、工具选择与语言生成
+Tools / Skills	执行外部动作；稳定能力可沉淀为 Skill
+Result + Reward + Critic	评价执行结果，与目标差异化打分
+Episodic Memory	保存原始经历、上下文、动作、结果与评分
+Experience Mining	跨多次经历归纳稳定规律，形成可复用经验
+Consolidation Gate	判断经验是否值得进入训练
+Training Buffer + Replay	新经验与旧经验混合，形成小规模训练集
+LoRA / Adapter 微调	周期性、小步更新；通过回归测试后才启用
+
+关键分工 / 实时执行链路尽量不训练；训练属于“沉淀阶段”。也就是说，Agent 可以每天持续工作，但参数更新只在经验累积到足够稳定时周期性触发。
+
+3. 五级记忆与学习层次
+层级	名称	时间尺度	保存内容	定位
+---	---	---	---	---
+L0	KV Cache	秒～分钟	复用模型前缀计算结果	加速，不代表知识学习
+L1	Working Memory	分钟～单任务	当前目标、计划、状态、临时变量	任务完成后大部分释放
+L2	Episodic Memory	小时～长期	一次完整经历：情境→动作→结果→评分	可检索，但未经验证
+L3	Experience / Skill	长期	从多次经历中提炼出的规律、策略、技能	可复用、可统计置信度
+L4	Parametric Experience	长期/慢速	通过 LoRA/Adapter 固化的稳定倾向	轻量影响权重，可回滚
+
+理解重点： L0/L1 解决“当前怎么快速思考”，L2/L3 解决“过去学到了什么”，L4 才解决“这些经验是否值得进入参数”。
+4. 经验沉淀：从一次经历到稳定规律
+每次执行结束后，不直接训练，而是先形成一条结构化 Episode。推荐最少保存以下字段：
+Situation：当时的任务、环境与关键状态。
+Action：模型做了什么、调用了哪些工具/技能。
+Result：实际结果与目标差异。
+Reward / Score：成功度、成本、风险、耗时等评分。
+Reflection：失败原因、成功原因、下一次可改进方向。
+Trace：必要时保留可复盘的局部推理产物、工具返回值或关键日志。
+经验不是“出现一次就算数” / 只有当相似规律在不同场景、多次尝试中重复成立，且没有明显反例时，才从 Episodic Memory 晋升为 Experience。这样可以把“偶然成功”与“稳定规律”分开。
+
+5. Consolidation Gate：哪些经验可以进入权重
+在 Experience 和训练之间增加一个“固化门”。它决定某条经验是继续留在外部记忆，还是值得消耗参数容量。
+检查项	判断问题
+---	---
+重复性	是否在多次相似任务中出现，而不是单次偶然。
+跨场景稳定性	是否在不同输入、环境和任务变体中仍然成立。
+置信度	成功/失败统计是否形成明确趋势。
+反例数量	是否存在大量与该经验冲突的证据。
+收益	采用该经验是否稳定提高 Reward 或降低成本/风险。
+参数价值	这条规律是否值得“内化”；如果检索一次就能解决，则未必需要训练。
+回归风险	更新后是否会破坏原有常用能力。
+
+6. “微微影响权重”的推荐实现
+不建议频繁修改 Base Model。更稳妥的方式是把长期经验先写入独立 Adapter，让有效权重表现为：
+W_effective = W_base + α · ΔW_adapter
+其中 W_base 长期冻结；ΔW_adapter 保存经验产生的小偏移；α 控制经验对模型行为的影响强度。α 可以很小，也可以按经验域分别配置。
+训练方式：以小规模 LoRA/Adapter SFT 为主；若数据天然包含“优/劣答案对”，可进一步使用偏好式训练。
+训练节奏：不在每次对话后训练，而是在训练缓冲区达到阈值后离线或低负载周期执行。
+经验回放：新训练批次混入一部分历史高质量样本，减少连续更新造成的旧能力退化。
+版本管理：每次 Adapter 更新都保留版本号、训练样本摘要和测试结果；不通过即可快速回滚。
+长期合并：只有极其稳定、长期有效的经验才考虑合并；大多数情况下保留独立 Adapter 已足够。
+7. 自我探索不建议直接使用无界 BFS
+“目标 → 多次尝试 → 评分 → 修正方向”确实需要探索，但不宜把整个 Agent 行为空间当作普通图做广度优先搜索。LLM 的动作分支太多，成本会迅速膨胀。
+简单任务：单路径执行 + Critic 失败重试。
+需要多个候选时：一次生成少量方案（例如 2～5 个），先低成本打分，再执行最优候选。
+复杂规划：使用 Beam 风格的受限分支，只保留高分路径；设置最大深度、最大分支数和预算。
+真实机器人/高成本工具：优先使用模拟、规则检查或低风险验证，避免“为了探索而探索”。
+8. 完整运行闭环
+读取 Goal 与当前环境状态，建立短 Working Memory。
+模型使用 Base + 当前 Adapter 推理；稳定前缀尽量复用 KV Cache。
+选择工具/技能并执行动作。
+收集 Result，由 Reward/Critic 给出结果评分。
+保存 Episode；必要时立即形成短期 Reflection，但不训练。
+后台/阶段性对多条 Episode 聚类、去重、比较成功与失败轨迹。
+把稳定模式提炼为 Experience / Skill，并附带置信度与适用范围。
+通过 Consolidation Gate 选择少量高价值经验进入 Training Buffer。
+混入 Replay 样本，执行小步 LoRA/Adapter 更新。
+运行回归集与安全检查；通过则启用新 Adapter，不通过则回滚。
+9. 推荐的数据结构
+为了后续工程实现，至少需要四类可持久化对象：
+对象	建议字段/用途
+---	---
+Episode	单次经历。字段可包含 episode_id、goal、state、action、tool_trace、result、reward、reflection、timestamp。
+Experience	被多次验证的规律。字段可包含 experience_id、pattern、recommendation、confidence、support_count、counterexample_count、scope。
+Skill	可直接复用的程序/工具流程。字段可包含 skill_id、description、input_schema、implementation、success_rate、dependencies。
+Adapter Version	参数固化版本。字段可包含 adapter_id、base_model_hash、training_dataset_id、learning_rate、steps、regression_score、rollback_parent。
+
+10. 建议的实现顺序（MVP）
+阶段 1：只做记忆：实现短 Working Memory、Episode 存档、检索；先验证上下文缩短是否稳定。
+阶段 2：经验提炼：加入 Critic、Reflection、Experience Mining；让模型不训练也能通过经验检索变得更稳。
+阶段 3：技能沉淀：把高频、可程序化的操作整理为 Skill，减少模型重复推理。
+阶段 4：参数固化：建立 Training Buffer、Replay、LoRA/Adapter 微调与回归测试；先人工触发训练。
+阶段 5：半自动持续学习：让 Consolidation Gate 自动推荐“值得训练的经验”，但训练启用仍有明确预算、版本与回滚机制。
+最终形态 / 这个系统的本质不是“一个会不停自我训练的模型”，而是一个拥有多级记忆、多级学习速度和参数固化机制的本地认知系统：快变化放在上下文与外部记忆，慢变化才进入参数。
+
+11. 新增核心原则：不要重复理解已经稳定的世界
+对于具身 Agent，真正昂贵的不是“看见”，而是反复对已经理解过的内容重新编码和推理。
+因此视觉、传感器、上下文、记忆和权重应遵循同一个原则：
+
+稳定的信息 → 复用
+发生变化的信息 → 更新
+新的信息 → 识别
+重要的变化 → 唤醒高层 LLM
+稳定且反复成立的规律 → 才允许进入长期权重
+
+可将这一原则概括为：
+World(t+1) = World(t) + Meaningful Delta
+
+整个系统不是每一帧重新回答“世界是什么”，而是持续回答：
+“与我当前认为的世界相比，刚才发生了什么变化？”
+
+12. 事件驱动认知（Event-driven Cognition）
+底层感知与控制持续运行，高层 LLM 不需要持续运行。
+
+推荐频率关系：
+IMU / 控制环：100～1000 Hz 或更高，由确定性算法负责
+编码器 / 距离传感器：高频状态估计
+Camera：15～60 FPS
+视觉变化检测：持续运行
+World State 更新：按事件或固定低频运行
+VLM：只在新区域、明显变化或语义不确定时调用
+主 LLM：只在目标相关、风险较高、预测误差较大或需要决策时调用
+
+事件重要度可以定义为：
+Salience =
+    α × ChangeMagnitude
+  + β × Novelty
+  + γ × GoalRelevance
+  + δ × Risk
+  + ε × PredictionError
+
+低显著性：
+只更新 World State。
+
+中显著性：
+写入 Event / Episodic Memory。
+
+高显著性：
+立即触发高层推理或规划。
+
+极高风险：
+由底层安全控制器直接处理，不等待 LLM。
+
+13. 增量视觉：只重新理解变化部分
+视觉系统不采用“每一帧都完整送入 VLM”的方式。
+
+推荐链路：
+Camera
+↓
+低成本变化检测
+↓
+Change Mask
+↓
+变化区域分割
+↓
+历史视觉实体匹配
+↓
+已知区域：复用旧特征
+移动区域：更新位置/姿态
+变化区域：重新编码
+新区域：调用 VLM
+↓
+Semantic Delta
+↓
+更新 World State
+
+关键目标：
+不是识别“这一帧里有什么”，而是识别“哪些东西是旧的、哪些移动了、哪些真的发生了变化、哪些是新的”。
+
+14. 不使用死板固定块：Adaptive Region / Entity
+固定 Patch 网格适合作为原型，但容易受到目标移动、摄像头运动和物体跨块影响。
+
+更合理的层次是：
+Pixel
+↓
+Region
+↓
+Entity
+
+Pixel → Region 可综合：
+颜色差
+亮度差
+边缘
+纹理
+空间连续性
+运动一致性
+深度信息
+
+纯 RGB 色差不建议作为唯一条件。
+更推荐在 Lab / YUV 等能够分离亮度与色度的空间中计算变化，再结合边缘和运动。
+
+示例变化评分：
+ChangeScore =
+    α × ColorDelta
+  + β × LumaDelta
+  + γ × EdgeDelta
+  + δ × MotionDelta
+  + ε × FeatureDelta
+
+变化掩码只负责找“哪里值得看”，最终区域边界由自适应分割决定。
+
+Region → Entity 再综合：
+视觉 Embedding
+颜色/纹理
+形状
+运动轨迹
+深度
+空间关系
+VLM 语义
+
+最终缓存的核心不是 screen_patch_12，而是：
+entity_person_01
+entity_door_03
+entity_table_02
+
+15. 持久视觉缓存（Persistent Visual Cache）
+视觉对象不能因为离开摄像头视野就从世界模型中消失。
+
+推荐为每个视觉实体保存：
+entity_id
+visual_feature
+semantic_label
+world_position
+relative_position
+velocity
+pose / state
+last_seen
+visible
+confidence
+parent_relation
+version
+
+例如：
+door_01
+semantic = "door"
+world_position = (x, y, z)
+state = open
+visible = false
+confidence = 0.94
+
+当机器人重新看到它时，应判断为：
+door_01 visible again
+
+而不是：
+new object detected
+
+这形成最基本的“物体恒常性（Object Permanence）”。
+
+16. 视觉缓存的正确层级
+即时视觉状态不应频繁写入真正模型权重。
+
+推荐缓存分层：
+
+V0 原始帧缓存
+生命周期：几十～几百毫秒
+用途：帧差、光流、短期比较
+
+V1 Region / Feature Cache
+生命周期：秒～分钟
+用途：复用视觉编码结果、跨帧实体匹配
+
+V2 Visual Token Cache
+生命周期：当前场景/任务
+用途：避免重复编码稳定视觉内容
+
+V3 Transformer KV Cache
+生命周期：当前推理上下文
+用途：复用已经进入 Transformer 的计算结果
+
+V4 Semantic World State
+生命周期：分钟～长期
+用途：保存“世界当前是什么样”
+
+V5 Episodic Visual Memory
+生命周期：长期
+用途：保存重要视觉事件和关键帧
+
+真正的 Base Weight / Long-term LoRA 不用于保存：
+“杯子现在在桌子上”
+“门刚刚打开”
+这类快速变化状态。
+
+17. 临时权重（Fast Weights）的定位
+Fast Weights / Temporary Adapter 可以作为未来实验方向，但不建议用来保存瞬时视觉场景。
+
+更适合进入 Fast Weights 的内容：
+当前环境中反复出现的短期规律
+某个任务周期内稳定的注意偏好
+某个场景中持续有效的策略倾向
+某类人物/环境长期重复的局部模式
+
+不适合进入 Fast Weights：
+物体当前坐标
+门当前开关状态
+杯子当前位置
+机器人瞬时姿态
+
+概念上可写为：
+W_effective =
+    W_base
+  + λ_long × ΔW_long
+  + λ_fast × ΔW_fast
+
+其中：
+ΔW_fast 生命周期短，可衰减、丢弃或在任务结束后冻结；
+ΔW_long 只保存经过长期验证的稳定经验。
+
+第一版工程实现建议：
+先用 Temporary Memory Tokens / Feature Cache / Working Memory 模拟 Fast Weights，
+等整体架构跑通以后，再尝试真正的临时 LoRA 或低秩快速权重。
+
+18. 几何世界状态：机器人首先要知道“我在哪里”
+世界建模不能只依赖视觉语义，还需要一个持续更新的几何状态估计器。
+
+基本状态向量可包含：
+位置 p = [x, y, z]
+速度 v = [vx, vy, vz]
+姿态 q / R
+角速度
+加速度
+IMU gyro bias
+IMU accel bias
+位置置信度
+姿态置信度
+
+不同传感器负责不同信息：
+
+IMU：
+高频预测短时间运动变化，频率高，但积分会漂移。
+
+轮编码器：
+提供轮式机器人相对位移和速度。
+
+GPS：
+提供全局绝对位置，长期不易漂移，但局部噪声较大，室内可能不可用。
+
+视觉里程计 / VIO：
+利用相机和视觉特征估计相对运动。
+
+深度 / ToF / 双目：
+帮助估计障碍物和视觉实体的三维位置。
+
+磁力计：
+可作为绝对航向辅助，但需处理磁场干扰。
+
+19. 多传感器融合算法
+第一版推荐 EKF（Extended Kalman Filter）。
+
+EKF 工作方式：
+上一状态
+↓
+利用 IMU / 运动模型预测
+↓
+GPS / 编码器 / 视觉等新观测到来
+↓
+根据观测噪声和状态协方差修正
+↓
+得到新的最佳状态估计
+
+优点：
+计算量低
+成熟
+适合实时机器人
+容易在 MCU / CPU 上运行
+
+第二阶段推荐 Factor Graph（因子图）。
+
+因子图中：
+X0、X1、X2…… 表示机器人不同时间点的状态。
+
+约束可以来自：
+IMU Factor
+Encoder / Odometry Factor
+GPS Factor
+Visual Odometry Factor
+Landmark Factor
+Loop Closure Factor
+
+系统求解：
+“哪一组位置、姿态和地图最能同时满足所有传感器约束？”
+
+推荐路线：
+MVP：
+IMU + Encoder + GPS → EKF
+
+高级版：
+IMU + Encoder + GPS + Visual Odometry + Landmark + Loop Closure → Factor Graph / SLAM
+
+20. 几何世界模型 + 语义世界模型
+最终需要维护两个互补世界：
+
+A. Geometric World Model
+回答：
+我在哪里？
+物体在哪里？
+距离多少？
+方向多少？
+机器人速度多少？
+姿态如何？
+这个地标的世界坐标是什么？
+
+B. Semantic World Model
+回答：
+这是什么？
+这个人是谁？
+门是开还是关？
+这个人在做什么？
+这个区域属于房间还是走廊？
+刚才发生了什么事件？
+
+最终合并为：
+Unified World Model =
+    Geometric World Model
+  + Semantic World Model
+
+示例：
+robot:
+  position = (12.4, 5.7, 0.0)
+  heading = 83.2°
+  speed = 0.31 m/s
+  confidence = 0.96
+
+door_03:
+  semantic = "door"
+  world_position = (14.1, 6.2, 0.0)
+  state = open
+  visible = true
+
+person_07:
+  world_position = (13.6, 5.9, 0.0)
+  state = approaching
+  confidence = 0.91
+
+21. 为什么 IMU 对视觉世界模型很重要
+摄像头画面变化有两种原因：
+
+A. 世界真的变了
+例如：
+人移动
+门打开
+杯子被拿走
+
+B. 机器人自己动了
+例如：
+机器人转头
+机器人向前运动
+摄像头震动
+
+如果没有自身姿态信息，视觉系统可能把：
+“摄像头转了 30°”
+误认为：
+“整个世界向左移动了”。
+
+因此视觉变化需要和 Robot Pose 联合判断：
+
+Visual Change
++
+IMU / Odometry Estimated Camera Motion
+↓
+去除 Ego Motion
+↓
+得到真正的 World Delta
+
+这一步是从“视频差分”进入“世界变化理解”的关键。
+
+22. 从屏幕坐标升级到世界坐标
+视觉实体不应长期只保存：
+screen_x
+screen_y
+
+应尽可能转换成：
+world_x
+world_y
+world_z
+
+使用：
+Camera Intrinsics
+Camera Extrinsics
+Robot Pose
+Depth / Stereo / Known Geometry
+
+把：
+屏幕中的目标位置
+↓
+转换到机器人坐标
+↓
+再转换到世界坐标
+
+这样机器人转身后：
+物体在屏幕中的位置变化很大，
+但 world_position 基本不变。
+
+系统即可区分：
+“我动了”
+和
+“物体动了”。
+
+23. 世界状态的增量更新
+推荐所有感知结果统一转换成 Delta Event。
+
+示例：
+{
+  "source": "vision",
+  "entity": "door_01",
+  "attribute": "state",
+  "old": "closed",
+  "new": "open",
+  "confidence": 0.96,
+  "timestamp": 123456
+}
+
+IMU 也可以形成高层事件：
+{
+  "source": "imu",
+  "entity": "robot",
+  "attribute": "balance",
+  "old": "stable",
+  "new": "risk",
+  "severity": "high"
+}
+
+GPS / State Estimator：
+{
+  "source": "localization",
+  "entity": "robot",
+  "attribute": "zone",
+  "old": "room_A",
+  "new": "corridor_B"
+}
+
+所有高层事件进入统一 Event Bus。
+
+24. 主 LLM 的职责边界
+LLM 不负责：
+1000 Hz IMU 融合
+PID / 平衡控制
+电机闭环
+原始 GPS 滤波
+每一帧像素差
+紧急刹车
+碰撞保护
+
+这些应由：
+控制器
+滤波器
+状态估计器
+规则
+安全层
+确定性程序
+负责。
+
+LLM 负责：
+理解高层 World State
+理解事件变化
+结合 Goal 与 Memory 判断意义
+规划下一步
+选择 Tool / Skill
+进行语言交互
+处理需要语义和常识的复杂决策
+
+因此系统应形成：
+低层连续世界 → 数学/控制算法
+高层语义世界 → VLM / LLM
+
+25. 更新后的完整具身认知架构
+真实世界
+│
+├── Camera
+├── IMU
+├── Encoder
+├── GPS
+├── Depth / Distance
+├── Audio
+└── 其他传感器
+│
+▼
+Low-level Perception / State Estimation
+│
+├── Frame Difference
+├── Motion / Optical Flow
+├── EKF / Factor Graph
+├── Pose Estimation
+└── Sensor Health
+│
+▼
+Adaptive Visual Region
+│
+▼
+Persistent Entity Matching
+│
+├── Known → Reuse
+├── Moved → Update Pose
+├── Changed → Re-encode
+└── New → VLM
+│
+▼
+Geometric + Semantic World Model
+│
+▼
+Delta Event / Salience
+│
+├── Low → Update State
+├── Medium → Memory
+├── High → LLM
+└── Critical → Safety Controller
+│
+▼
+Working Memory
+│
+▼
+Local LLM = Base + Adapter
+│
+▼
+Tool / Skill / Action
+│
+▼
+Environment Result
+│
+▼
+Reward / Critic
+│
+▼
+Episode
+│
+▼
+Experience Mining
+│
+├── Memory
+├── Skill
+└── Consolidation Candidate
+│
+▼
+Consolidation Gate
+│
+▼
+Replay + LoRA
+│
+▼
+Regression Test
+│
+├── PASS → New Adapter
+└── FAIL → Rollback
+│
+└────────────→ 下一轮
+
+26. 更新后的关键数据对象
+RobotState
+字段建议：
+timestamp
+position
+velocity
+orientation
+angular_velocity
+acceleration
+imu_bias
+localization_confidence
+motion_state
+
+VisualEntity
+字段建议：
+entity_id
+semantic_label
+visual_embedding
+world_position
+relative_position
+velocity
+pose
+state
+visible
+last_seen
+confidence
+parent_entity
+feature_version
+
+WorldState
+字段建议：
+robot_state
+static_entities
+dynamic_entities
+active_events
+current_zone
+map_reference
+world_version
+
+DeltaEvent
+字段建议：
+event_id
+source
+entity_id
+attribute
+old_value
+new_value
+magnitude
+novelty
+goal_relevance
+risk
+prediction_error
+salience
+confidence
+timestamp
+
+Episode
+在原有字段基础上新增：
+start_world_state
+important_events
+world_state_deltas
+sensor_summary
+localization_quality
+keyframes
+
+27. 更新后的 MVP 实现顺序
+阶段 1：本地 Agent
+Local LLM
+Tool Registry
+Working Memory
+基础 Agent Loop
+
+阶段 2：机器人状态估计
+IMU
+Encoder
+GPS（有条件时）
+EKF
+RobotState
+
+阶段 3：基础增量视觉
+Frame Difference
+Change Mask
+ROI
+简单颜色/亮度/边缘/运动变化检测
+
+阶段 4：Adaptive Region + Visual Feature
+Superpixel / 自适应分区
+Visual Embedding
+Region Cache
+相似度匹配
+
+阶段 5：Entity 层
+跨位置实体匹配
+Persistent Visual Entity
+visible / last_seen
+物体恒常性
+
+阶段 6：世界坐标
+Camera Calibration
+Robot Pose
+Depth / Stereo / Distance
+屏幕坐标 → 世界坐标
+
+阶段 7：Unified World Model
+Geometric Map
+Semantic Entity Map
+WorldState
+DeltaEvent
+Event Bus
+
+阶段 8：VLM 语义认知
+只把 New / Changed / Uncertain Region 送入 VLM
+将结果写回 Entity / World State
+
+阶段 9：事件驱动 LLM
+Salience
+Goal Relevance
+Risk
+只有值得思考的事件唤醒主模型
+
+阶段 10：经验系统
+Trajectory
+Episode
+Reward
+Critic
+Experience Mining
+
+阶段 11：Skill / Memory 分流
+事实 → Memory
+可程序化流程 → Skill
+稳定策略 → Consolidation Candidate
+
+阶段 12：LoRA 固化
+Consolidation Gate
+Replay Buffer
+LoRA
+Regression
+Rollback
+
+阶段 13：高级定位
+Visual Odometry
+VIO
+Factor Graph
+Loop Closure
+Semantic Landmark
+
+阶段 14：Fast Weights 实验
+仅在完整系统稳定后尝试：
+Temporary Adapter
+Low-rank Fast Weights
+Memory Token Adapter
+短期规律衰减机制
+
+28. 最终设计原则
+整个架构可以浓缩为以下原则：
+
+1）已经稳定的信息不重复计算。
+2）变化先在低成本层发现，再逐级升级处理。
+3）屏幕位置不是实体身份，实体必须跨位置、跨视角保持连续。
+4）看不见不等于不存在，世界模型必须保存视野外实体。
+5）视觉变化必须扣除机器人自身运动。
+6）瞬时状态保存在 World State，不写入长期权重。
+7）一次经历进入 Episode，多次验证才成为 Experience。
+8）可程序化经验优先进入 Skill。
+9）稳定、高频、跨场景成立的经验才允许进入 LoRA。
+10）底层实时控制和安全保护永远不交给 LLM。
+11）几何世界负责“在哪里”，语义世界负责“是什么、发生了什么”。
+12）整个系统本质上维护的是一个持续存在、增量更新的内部世界。
+
+最终目标不是让模型“每一帧都重新看世界”，而是：
+
+持续维持一个内部世界模型；
+对新信息和变化保持敏感；
+只在值得思考的时候唤醒大模型；
+把一次次现实经历沉淀成经验；
+再把真正稳定的经验缓慢写进长期参数。
+
+这使系统从普通“聊天模型 + 摄像头”，逐步走向：
+低算力、本地运行、具有物体恒常性、空间认知、长期经验和参数固化能力的具身持续学习 Agent。
+
+======================================================================
+29. v2.1 的总体认知：系统不是“不断调用大模型”，而是维持一个持续存在的内部世界
+======================================================================
+
+本项目进一步形成一个核心认知：
+
+“智能”不一定要求大模型持续高频运行。
+更重要的是：
+1）持续保持内部状态；
+2）持续检测世界变化；
+3）对异常、变化、目标相关信息和预测误差提高注意力；
+4）只在需要高层语义推理时唤醒模型。
+
+可以把整体系统理解成一种事件驱动的认知系统：
+
+现实世界
+↓
+底层持续感知
+↓
+与当前 World State 比较
+↓
+没有重要变化
+→ 继续维持状态，不唤醒 LLM
+
+出现重要变化
+→ 形成 Delta Event
+→ 提高 Attention / Salience
+→ 调用 VLM / LLM
+→ 更新 World State / Plan / Memory
+
+这比传统方式：
+“Camera Frame → VLM → LLM → Camera Frame → VLM → LLM……”
+更加适合长期运行的本地机器人。
+
+工程上的核心公式可以统一写成：
+
+State(t+1) = State(t) + Delta(t)
+
+Memory(t+1) = Memory(t) + ImportantExperience(t)
+
+Weight(t+1) ≈ Weight(t) + VerySmallStableUpdate(t)
+
+越靠近现实时间的层，变化越快；
+越靠近模型参数的层，变化越慢。
+
+======================================================================
+30. 三种学习速度：即时状态、短期适应、长期固化
+======================================================================
+
+本项目最终不只有“短期记忆”和“长期记忆”，而是至少存在三种学习速度。
+
+A. 即时状态层
+时间尺度：
+毫秒～分钟
+
+内容：
+KV Cache
+Visual Feature Cache
+RobotState
+WorldState
+Working Memory
+最近事件
+
+特点：
+更新极快
+可以覆盖
+可以删除
+不应污染长期参数
+
+B. 短期适应层
+时间尺度：
+一次任务～数小时/数天
+
+内容：
+Temporary Memory
+Temporary Skill
+Fast Weights（未来实验）
+Temporary Adapter（未来实验）
+当前场景中的重复模式
+
+特点：
+比 World State 稳定
+但仍允许衰减或丢弃
+
+C. 长期固化层
+时间尺度：
+天～周～更长期
+
+内容：
+Experience
+Stable Skill
+Long-term LoRA / Adapter
+极少数长期 Merge
+
+特点：
+变化非常慢
+需要重复证据
+需要回归测试
+需要版本管理
+必须可回滚
+
+可以把有效模型表示为：
+
+W_effective
+=
+W_base
++
+λ_long × ΔW_long
++
+λ_fast × ΔW_fast
+
+其中：
+
+W_base：
+基础模型，原则上长期冻结。
+
+ΔW_long：
+经过长期验证的参数经验。
+
+ΔW_fast：
+短期适应，可衰减、卸载、丢弃。
+
+注意：
+瞬时视觉场景、物体当前位置、门当前是否打开等信息仍不应该写入 ΔW_fast。
+这些属于 World State，而不是权重记忆。
+
+======================================================================
+31. World State 与 World Model 必须分开
+======================================================================
+
+World State 回答：
+“世界现在是什么样？”
+
+例如：
+robot.position = (2.1, 5.7)
+robot.heading = 72°
+door_01.state = open
+person_03.position = (4.2, 6.0)
+person_03.motion = approaching
+
+World Model 回答：
+“如果接下来发生某个动作，世界可能变成什么样？”
+
+例如：
+
+当前状态：
+机器人前方 0.8m 有障碍
+速度 0.35m/s
+
+候选动作：
+forward
+
+预测：
+0.8 秒内碰撞概率升高
+
+候选动作：
+slow_down
+
+预测：
+碰撞风险降低
+
+因此：
+
+World State
++
+Action Candidate
+↓
+World Model
+↓
+Predicted Next State
+↓
+Risk / Reward
+↓
+Decision
+
+第一版 World Model 不必直接训练一个巨大的神经网络。
+可以由多层组成：
+
+低层：
+运动学
+动力学
+碰撞检测
+PID/控制模型
+
+中层：
+状态转移规则
+障碍物运动趋势
+简单轨迹预测
+
+高层：
+LLM / VLM 基于语义和经验做因果预测
+
+最终再通过真实结果计算：
+
+Prediction Error
+=
+Actual Result - Predicted Result
+
+Prediction Error 可以同时作为：
+注意力信号
+经验价值信号
+模型修正信号
+世界模型学习信号
+
+因此“变化敏感”进一步升级为：
+“对预测错误敏感”。
+
+======================================================================
+32. Grounding：让模型知识真正连接现实
+======================================================================
+
+纯文本模型知道：
+“推杯子，杯子可能移动。”
+
+这是来自训练语料的语言知识。
+
+具身 Agent 可以自己经历：
+
+视觉：
+检测到 cup_01
+
+动作：
+机械臂接触 cup_01
+
+控制：
+施加推力
+
+传感器：
+力 / 位置发生变化
+
+视觉：
+cup_01 位移 12cm
+
+结果：
+push → displacement
+
+这就形成现实 Grounding。
+
+本项目真正有价值的长期学习链应该是：
+
+感知
+↓
+内部世界状态
+↓
+行动
+↓
+真实世界反馈
+↓
+结果评分
+↓
+Episode
+↓
+重复经验
+↓
+Experience
+↓
+稳定因果规律
+↓
+Skill / LoRA
+
+因此最终进入权重的不只是互联网上已有的语言规律，
+而可能包含：
+“这个机器人自己的身体，在这个真实环境中，采取某类动作之后通常会发生什么。”
+
+这也是本项目从普通 Agent 向 Embodied Continual Learning Agent 演进的关键。
+
+======================================================================
+33. VLM 的定位：视觉认知编码器 / 语义压缩器
+======================================================================
+
+现代 VLM 已经能够识别：
+物体
+人物
+动作
+场景
+关系
+文字
+界面
+姿态
+部分意图
+简单因果
+
+因此不需要在 VLM 前重新造一个过于复杂的传统视觉系统。
+
+传统 CV 在本项目中的主要任务应是：
+便宜地判断哪里变化了
+跟踪实体
+估计运动
+提供深度 / 几何
+管理缓存
+
+而 VLM 负责：
+Pixel
+↓
+Object
+↓
+Relation
+↓
+Event
+↓
+Meaning
+
+也就是说：
+
+VLM 不是单纯 Object Detector，
+而是 Visual Cognitive Encoder。
+
+它承担一个重要作用：
+把几百万像素压缩成少量高价值语义。
+
+例如：
+1920×1080 图像
+↓
+VLM
+↓
+“person_03 从门后进入，并正在向机器人靠近”
+
+主 LLM 需要处理的是 Meaning，
+而不是完整像素。
+
+因此推荐：
+
+Camera
+↓
+Cheap Change Detector
+↓
+New / Changed / Uncertain Region
+↓
+VLM
+↓
+Semantic Delta
+↓
+World State
+↓
+Main LLM
+
+======================================================================
+34. 视觉 KV Cache：有，但不能简单把移动区域的 KV 原封不动搬过去
+======================================================================
+
+多模态模型常见链路：
+
+Image
+↓
+Vision Encoder
+↓
+Visual Features / Visual Tokens
+↓
+Projector
+↓
+LLM Transformer
+↓
+Text Output
+
+其中可以存在多种缓存：
+
+1）Vision Feature Cache
+缓存视觉编码器产生的中间特征。
+
+2）Visual Token Cache
+缓存已经生成的视觉 Token。
+
+3）LLM KV Cache
+Visual Token 进入 Transformer 后，其 K/V 也可以进入 KV Cache。
+
+但是存在关键限制：
+
+普通 Transformer 的表示通常带有位置关系。
+同一个视觉内容从屏幕左侧移动到右侧，
+内容可能相同，
+位置编码却不同。
+
+因此不能简单做：
+
+old_visual_KV
+→ copy
+→ new_position
+
+更合理的做法是尽可能把：
+
+Content Feature
+与
+Spatial Position
+
+分开管理。
+
+例如：
+
+entity_door_01:
+    content_feature = [...]
+    semantic = door
+    world_position = (...)
+    screen_position = (...)
+
+摄像头转动后：
+
+content_feature：
+尽量复用
+
+screen_position：
+重新更新
+
+world_position：
+原则上保持稳定
+
+对于需要进入完整视觉 Transformer 的部分，
+可以使用：
+运动向量对齐
+特征复用
+局部重新计算
+背景/前景解耦
+定期刷新
+等方式减少误差累积。
+
+因此视觉增量缓存的优先级建议是：
+
+优先缓存：
+位置编码之前或较早阶段的 Content Feature
+
+其次：
+视觉 Token
+
+最后：
+在结构允许时复用 KV Cache
+
+不要把“KV Cache”当成唯一视觉缓存方案。
+
+======================================================================
+35. 视觉缓存必须支持跨位置匹配，而不是只按屏幕坐标命中
+======================================================================
+
+第一版固定 Patch 可以用于验证想法，
+但最终需要：
+
+内容匹配
+而不是
+位置匹配。
+
+例如：
+
+上一帧：
+door_01 位于屏幕右侧
+
+下一帧：
+摄像头转动
+door_01 位于屏幕左侧
+
+系统应判断：
+
+old_region_feature
+≈
+new_region_feature
+
+Entity ID 相同：
+door_01
+
+因此只更新：
+door_01.relative_position
+
+而不是重新进行：
+“这是什么？”
+“这是不是一扇门？”
+“我以前见过它吗？”
+
+匹配可以综合：
+
+Visual Embedding
+Color
+Texture
+Shape
+Depth
+Motion Vector
+Optical Flow
+Spatial Consistency
+Semantic Label
+历史轨迹
+
+可形成：
+
+IdentityScore =
+a × FeatureSimilarity
++ b × MotionConsistency
++ c × ShapeSimilarity
++ d × SpatialPrediction
++ e × SemanticConsistency
+
+只有 IdentityScore 足够高时复用旧 Entity。
+
+对于长时间离开视野的实体，
+confidence 应随时间缓慢衰减，
+但不能立刻删除。
+
+重新看见以后：
+Re-identification
+↓
+恢复可见状态
+
+======================================================================
+36. 颜色差不是最终切分方法，而是廉价变化门控
+======================================================================
+
+固定网格过于死板。
+纯色差又容易被：
+阴影
+光照
+纹理
+反射
+同色不同物体
+影响。
+
+因此最终设计是：
+
+颜色 / 亮度变化
+只负责生成候选 Change Mask。
+
+随后再通过：
+
+Edge
+Texture
+Motion
+Depth
+Spatial Connectivity
+Superpixel
+Feature Similarity
+
+形成 Adaptive Region。
+
+推荐：
+
+Frame(t-1)
++
+Frame(t)
+↓
+Lab / YUV Color + Luma Difference
+↓
+Motion / Edge Difference
+↓
+Change Mask
+↓
+Adaptive Segmentation
+↓
+Region
+↓
+Entity Matching
+
+即：
+
+颜色差负责：
+“哪里可能变了？”
+
+Entity 层负责：
+“到底是什么东西变了？”
+
+======================================================================
+37. 视频压缩本身也可以成为视觉增量计算的信号源
+======================================================================
+
+本项目可以进一步利用视频编码器已有的信息：
+
+I/P/B Frame
+Motion Vector
+Residual
+Macroblock / Coding Unit
+
+视频压缩本身就是在寻找：
+
+“哪些区域和上一帧相同？”
+“哪些区域只是移动了？”
+“哪些区域真的出现新内容？”
+
+因此未来优化可以考虑：
+
+Camera / H.264 / H.265 Stream
+↓
+直接读取 Motion Vector + Residual
+↓
+映射到视觉 Region / Token
+↓
+Static
+Matchable
+Unmatchable
+
+Static：
+直接复用特征
+
+Matchable：
+根据运动关系映射到新位置
+
+Unmatchable：
+重新计算
+
+这可能比自己额外运行复杂光流更加省算力。
+
+======================================================================
+38. “睡眠”机制：正常工作和参数学习必须彻底分开
+======================================================================
+
+推荐正式定义 Wake / Sleep 两个阶段。
+
+WAKE：
+正常运行
+持续感知
+更新 World State
+调用工具
+完成任务
+保存 Episode
+检索 Experience / Skill
+不进行重训练
+
+SLEEP：
+低负载 / 空闲 / 用户不使用时
+整理 Episode
+去重
+聚类
+Experience Mining
+检查冲突
+生成训练样本
+Replay
+LoRA / Adapter Training
+Regression
+Rollback / Accept
+
+运行链：
+
+Wake
+↓
+Experience Accumulation
+↓
+Sleep
+↓
+Consolidation
+↓
+Wake
+↓
+继续工作
+
+这样可以防止：
+推理过程中训练导致延迟抖动
+新经验立即污染模型
+频繁写权重
+连续训练造成不稳定
+
+======================================================================
+39. 经验冲突与适用边界
+======================================================================
+
+长期运行后一定会出现冲突经验。
+
+例如：
+
+Experience A：
+条件 X 下应该做 Y
+
+Experience B：
+条件 X 下不应该做 Y
+
+不能直接删除其中一个。
+
+每条 Experience 应带：
+
+scope
+context
+confidence
+support_count
+counterexample_count
+exceptions
+last_validated
+source_domains
+
+最后可能形成：
+
+通常：
+X → Y
+
+但是：
+在 Z 条件下：
+X → not Y
+
+因此系统最终学到的不只是“规则”，
+而是：
+“规则 + 适用范围 + 例外”。
+
+这对于之后的 LoRA Consolidation 非常重要，
+否则模型容易把局部经验错误推广成全局行为。
+
+======================================================================
+40. 经验的三路分流：Memory / Skill / Weight
+======================================================================
+
+所有 Experience 不应该都训练进模型。
+
+推荐：
+
+Experience
+├── Memory
+├── Skill
+└── Parametric Consolidation
+
+A. Memory
+适合：
+事实
+位置
+人物信息
+低频知识
+一次性事件
+时间敏感内容
+
+B. Skill
+适合：
+可程序化步骤
+稳定工具流程
+重复操作
+确定性的策略
+
+C. Weight
+适合：
+高频思维倾向
+跨场景稳定决策原则
+通用行为偏好
+难以简单写成 Tool 的策略
+
+重要原则：
+
+能用 Skill 精确执行的，
+不要浪费神经网络参数。
+
+能用 Memory 检索解决的，
+未必需要训练。
+
+只有真正值得“变成本能”的经验，
+才进入长期 LoRA。
+
+======================================================================
+41. 参考实现一：Sleeping LLM
+======================================================================
+
+已讨论并核验的公开项目：
+GitHub：vbario/sleeping-llm
+
+其核心思想与本项目“沉淀后进入权重”高度相似。
+
+主要机制：
+
+Wake：
+模型正常运行并形成新记忆。
+
+Fast Weight：
+当前实现使用 MEMIT 进行快速、容量有限的权重编辑。
+
+Sleep：
+检查记忆状态并进行维护。
+
+Slow Consolidation：
+通过 LoRA 把短期、脆弱的记忆逐渐固化成长期参数。
+
+Validation：
+通过记忆召回与 Perplexity 等指标检查训练是否破坏模型。
+
+Rollback：
+健康检查不通过可以撤回更新。
+
+当前公开项目已经在本地消费级硬件上验证了 3B 量化模型的 sleep-wake 记忆固化流程。
+
+本项目可直接借鉴：
+
+1）Wake / Sleep 生命周期
+2）Fast / Slow Memory 分层
+3）LoRA Consolidation
+4）训练前后 Validation Gate
+5）Checkpoint / Rollback
+6）分阶段固化，而不是一次训练直接写死
+
+与本项目的不同：
+
+Sleeping LLM 目前重点是“事实记忆进入参数”。
+
+本项目进一步关注：
+真实 Agent 行为轨迹
+多传感器世界状态
+具身经验
+Skill
+视觉世界模型
+跨场景策略
+因果经验
+
+因此它适合作为“权重沉淀模块”的参考，而不是整个架构直接照搬。
+
+======================================================================
+42. 参考实现二：KARL
+======================================================================
+
+已讨论并核验的公开项目：
+GitHub：Diomandeee/karl
+
+KARL 的核心价值在于：
+它把真实 Agent 工作过程保存为 Trajectory Ledger，
+然后对轨迹评分，
+再把优质轨迹用于 Skill Routing 与 LoRA 训练。
+
+典型链路：
+
+User Prompt
+↓
+Agent 工作
+↓
+Read / Edit / Bash / Grep / Tool Call
+↓
+记录完整工具轨迹
+↓
+计算 Reward
+↓
+Trajectory Store
+↓
+筛选高质量样本
+↓
+SFT / LoRA
+↓
+Skill Routing
+
+公开实现使用六类评分信号：
+
+Outcome
+Process
+Efficiency
+Verification
+Consistency
+Wasted Motion
+
+这与本项目的：
+Result + Reward + Critic + Experience Mining
+非常接近。
+
+本项目可直接借鉴：
+
+1）Trajectory 数据结构
+2）工具调用日志
+3）多维 Reward
+4）用户纠错作为负反馈
+5）高质量轨迹筛选
+6）训练数据自动生成
+7）Skill Routing
+8）历史轨迹 Replay
+
+与本项目不同：
+
+KARL 更专注 coding agent。
+
+本项目需要进一步加入：
+视觉
+IMU
+GPS
+空间世界模型
+实体身份
+现实动作结果
+具身安全
+长期 Consolidation Gate
+
+因此 KARL 最适合作为：
+“经验记录 + 评分 + 训练数据生成”
+部分的参考实现。
+
+======================================================================
+43. 参考实现三：MetaClaw
+======================================================================
+
+已讨论并核验的公开项目：
+GitHub：aiming-lab/MetaClaw
+
+MetaClaw 体现的是：
+Agent 在日常真实使用中不断产生 Memory / Skill / Training Data，
+并在低干扰时段进行慢速更新。
+
+公开实现中已经存在：
+
+跨会话长期 Memory
+Skill 模式
+训练 / RL 模式
+Auto Mode
+增量记忆摄取
+后台 Consolidation
+睡眠 / 空闲 / 日程时间进行慢速更新
+
+它证明了一个重要系统方向：
+
+Agent 的“学习”不应该只存在于实验脚本，
+而可以成为长期运行 Agent Harness 的一部分。
+
+本项目可以借鉴：
+
+1）长期 Agent Runtime
+2）Memory Sidecar 思路
+3）Skill 与模型学习分离
+4）训练调度器
+5）Idle / Sleep Training
+6）支持集 / 查询集分离
+7）训练与正常 Agent 服务解耦
+
+与本项目不同：
+
+MetaClaw 当前参数训练主要依赖兼容训练后端，
+不是以完全本地 CPU / 小模型训练为核心设计目标。
+
+本项目要特别强调：
+
+本地模型
+本地 Memory
+本地 World Model
+本地 Training Buffer
+可选本地 LoRA
+尽可能不依赖远程训练服务
+
+======================================================================
+44. 参考理论：Dual-Layer Agentic Memory
+======================================================================
+
+2026 年论文：
+Dual-Layer Agentic Memory with Fast Write Routing and Slow Consolidation
+arXiv：2608.22215
+
+其思想与本项目非常接近：
+
+Incoming Information
+↓
+判断是否值得写
+├── no-write
+├── write-new
+└── write-update
+↓
+External Memory
+↓
+Periodic Consolidation
+↓
+SFT
+↓
+Model Parameters
+
+核心概念：
+
+Selective Externalization
++
+Selective Internalization
+
+即：
+
+不是所有信息都进入外部记忆；
+也不是所有外部记忆都进入模型参数。
+
+这与本项目的：
+
+Event Gate
+↓
+Memory
+↓
+Experience
+↓
+Consolidation Gate
+↓
+LoRA
+
+高度一致。
+
+本项目进一步加入：
+Embodiment
+World Model
+Delta Vision
+Sensor Fusion
+Skill
+Runtime Safety
+Fast Weights
+Visual Entity Persistence
+
+======================================================================
+45. 其他重要参考方向
+======================================================================
+
+A. Letta / MemGPT
+可借鉴：
+Working Memory
+长期 Memory
+上下文虚拟化
+Memory Block
+Context 管理
+
+核心启发：
+不要把所有历史都塞进上下文。
+
+B. Voyager
+可借鉴：
+Skill Library
+自动探索
+执行反馈
+成功能力程序化保存
+
+核心启发：
+很多经验应该变成 Skill，而不是权重。
+
+C. MUSE / EvolveR
+可借鉴：
+Trajectory
+Reflection
+Experience
+长期经验生命周期
+
+核心启发：
+一次失败/成功不是经验，
+多次经历经过比较后形成的规律才是经验。
+
+======================================================================
+46. 视觉增量计算的公开参考
+======================================================================
+
+A. VLMCache
+MobiSys 2026
+
+核心思想：
+把稳定背景和动态前景分离，
+稳定视觉块形成可复用缓存，
+动态部分重新计算，
+再恢复全局 Attention 和位置一致性。
+
+它说明：
+视觉 KV / Token 跨帧复用是可行方向，
+但不能忽略 ViT 的位置和全局 Attention 问题。
+
+B. STC
+GitHub：lern-to-write/STC
+CVPR 2026
+
+核心思想：
+Streaming Video 中复用静态视觉 Token，
+只重新编码动态部分，
+并进一步压缩进入 LLM 的视觉 Token 数量。
+
+与本项目高度相关：
+视觉不是每帧全算，
+而应该利用时间冗余。
+
+C. EP-ViT
+2026
+
+核心思想：
+直接利用视频编码中的 Motion Vector 与 Residual
+判断：
+Static Token
+Matchable Token
+Unmatchable Token
+
+只有不能匹配的 Token 重新计算。
+
+这与本项目“跨位置复用视觉实体”尤其接近。
+
+D. diffcua
+GitHub：sdan/diffcua
+
+这是一个很有价值的实验性参考。
+
+它验证了：
+使用 Patch Difference 找变化非常容易；
+静态画面直接返回缓存有明显收益。
+
+同时也验证了一个重要困难：
+单独重新编码孤立 Patch 在普通 ViT 中并不天然成立，
+因为位置 Embedding 和全局 Context 会造成不一致。
+
+因此本项目不能只写：
+
+“变化块单独送入原模型即可。”
+
+而应该设计：
+Content / Position 分离
+Motion Alignment
+Context Fusion
+Periodic Refresh
+或者修改视觉编码结构。
+
+======================================================================
+47. 本项目相对于已有方案真正的差异
+======================================================================
+
+Sleeping LLM 重点：
+参数记忆固化
+
+KARL 重点：
+Agent Trajectory → Reward → LoRA / Skill
+
+MetaClaw 重点：
+长期 Agent Runtime → Memory / Skill / Slow Learning
+
+VLMCache / STC / EP-ViT 重点：
+视觉 Token / Feature 跨帧复用
+
+SLAM / EKF / Factor Graph 重点：
+几何状态和位置估计
+
+本项目希望把这些原本分散的能力连接成一个系统：
+
+Local Model
++
+Working Memory
++
+Persistent Visual Cache
++
+Delta Vision
++
+Adaptive Region / Entity
++
+Object Permanence
++
+IMU / Encoder / GPS
++
+EKF / Factor Graph
++
+Geometric World Model
++
+Semantic World Model
++
+Predictive World Model
++
+Event-driven Cognition
++
+Trajectory
++
+Reward / Critic
++
+Experience Mining
++
+Skill
++
+Fast Weights（实验）
++
+Long-term LoRA
++
+Regression / Rollback
+
+最核心的差异不是某一个单独算法。
+
+而是完整的“信息生命周期”：
+
+像素 / 传感器
+↓
+变化
+↓
+状态
+↓
+事件
+↓
+经历
+↓
+经验
+↓
+技能 / 规律
+↓
+临时适应
+↓
+长期参数
+
+也就是说：
+同一个现实信息随着重复次数和稳定程度不同，
+会停留在不同记忆层。
+
+======================================================================
+48. 信息生命周期：什么时候该放在哪里
+======================================================================
+
+示例 1：
+“杯子现在在桌上。”
+
+存储：
+World State
+
+不训练。
+
+示例 2：
+“这个杯子刚刚被 person_01 拿走。”
+
+存储：
+Delta Event + Episode
+
+不训练。
+
+示例 3：
+“person_01 通常把杯子放在桌子左侧。”
+
+如果短期重复：
+Experience / Temporary Pattern
+
+示例 4：
+“易碎物体从桌沿掉落通常会损坏。”
+
+跨场景反复验证：
+Stable Experience
+
+可能进入：
+Long-term LoRA
+
+示例 5：
+“抓取杯子的固定机械臂动作序列。”
+
+更适合：
+Skill
+
+而不是 LoRA。
+
+因此所有新信息必须经过 Routing：
+
+New Information
+↓
+Is it transient state?
+→ World State
+
+Is it a meaningful event?
+→ Episode
+
+Is it reusable knowledge?
+→ Experience
+
+Can it be deterministic?
+→ Skill
+
+Is it stable, general and high-frequency?
+→ Consolidation Candidate
+
+======================================================================
+49. 预测误差是连接感知、注意、经验和学习的统一信号
+======================================================================
+
+本项目可以把 Prediction Error 作为非常重要的统一变量。
+
+系统总是在隐含预测：
+
+门应该继续关闭
+person_01 应该继续坐着
+机器人按照当前速度会继续向前
+当前位置应该和视觉地标一致
+
+如果现实与预测一致：
+低注意力
+高缓存复用
+低模型调用
+
+如果现实与预测明显不一致：
+
+Prediction Error ↑
+
+则：
+视觉重新编码优先级 ↑
+Salience ↑
+事件记录优先级 ↑
+Episode 价值 ↑
+Experience Mining 权重 ↑
+必要时唤醒 LLM
+
+因此可以定义：
+
+CognitivePriority =
+a × GoalRelevance
++
+b × Risk
++
+c × Novelty
++
+d × PredictionError
++
+e × Uncertainty
+
+这会使 Agent 从单纯“对像素变化敏感”，
+升级为：
+“对有意义的世界模型错误敏感”。
+
+======================================================================
+50. 不确定性也必须进入世界模型
+======================================================================
+
+现实感知永远不是绝对正确的。
+
+因此 Entity 和 World State 不应该只有：
+value
+
+还应有：
+confidence
+source
+last_seen
+uncertainty
+
+例如：
+
+door_01:
+    state = open
+    confidence = 0.97
+    last_seen = now
+
+person_07:
+    identity = unknown
+    confidence = 0.51
+
+object_12:
+    semantic = cup?
+    confidence = 0.63
+
+当置信度较低时：
+不要急着写入稳定 Memory。
+
+可以：
+继续观察
+重新调用 VLM
+换视角
+使用另一个传感器
+询问用户
+
+这允许 Agent 主动降低不确定性。
+
+======================================================================
+51. 传感器融合不仅用于定位，也用于“解释视觉变化”
+======================================================================
+
+IMU / Encoder / GPS 的价值不仅是告诉机器人“我在哪”。
+
+它们还帮助视觉判断：
+
+画面变化到底来自：
+世界变化
+还是
+机器人自身运动。
+
+例如：
+
+摄像头中的桌子整体左移。
+
+如果：
+IMU 检测机器人向右旋转 20°
+
+则更可能是：
+Ego Motion
+
+World Entity 的真实坐标不应变化。
+
+反之：
+
+Robot Pose 基本不变，
+只有 person_01 的区域发生位移。
+
+则更可能是：
+Dynamic Object Motion
+
+因此：
+
+Raw Visual Delta
+-
+Predicted Ego Motion
+=
+Estimated World Delta
+
+这一步是整个 Persistent Vision 成立的关键。
+
+======================================================================
+52. 世界模型中的静态实体与动态实体应分开
+======================================================================
+
+Static Entity：
+墙
+门框
+桌子
+固定设备
+建筑结构
+地标
+
+特点：
+移动概率低
+适合长期缓存
+可作为定位 Landmark
+可以长时间保持高 Confidence
+
+Dynamic Entity：
+人
+动物
+车辆
+移动机器人
+手持物体
+
+特点：
+需要 Velocity
+Trajectory
+Motion Prediction
+更快的 Confidence Decay
+更频繁更新
+
+推荐：
+
+WorldState
+├── StaticMap
+└── DynamicSceneGraph
+
+StaticMap：
+几何地图 + 语义 Landmark
+
+DynamicSceneGraph：
+Entity + Relation + Velocity + Intent/State
+
+这比把所有对象塞进一个扁平 JSON 更适合长期扩展。
+
+======================================================================
+53. 世界模型可以使用 Scene Graph
+======================================================================
+
+最终语义世界不建议只有实体列表。
+
+可以维护：
+
+Entity
++
+Relation
+
+例如：
+
+person_01
+holds
+cup_01
+
+cup_01
+on
+table_01
+
+table_01
+inside
+room_02
+
+door_01
+connects
+room_02
+corridor_01
+
+这种形式可以称为 Semantic Scene Graph。
+
+当视觉变化时，
+只修改局部关系：
+
+原：
+cup_01 ON table_01
+
+新：
+cup_01 HELD_BY person_01
+
+于是事件可以直接生成：
+
+Event:
+cup_01 picked_up_by person_01
+
+这种表示非常适合：
+Memory
+Planning
+Language
+World Model
+因果推理
+
+======================================================================
+54. Agent 不应该依赖持续视觉上下文，而应该依赖“世界状态版本”
+======================================================================
+
+可以给 World State 设置：
+
+world_version = 1024
+
+每次发生有效变化：
+
+world_version += 1
+
+LLM 工作时获得：
+
+current_goal
+world_version
+relevant_entities
+recent_delta_events
+relevant_memory
+
+而不是获取：
+最近 100 张图片
+全部历史视觉 Token
+全部传感器数据
+
+这样主模型上下文可以长期保持很短。
+
+如果需要核查某个实体：
+再按 entity_id 拉取：
+visual_feature
+keyframe
+history
+
+这与原始“短上下文 + 分阶段工作记忆”的思想完全统一。
+
+======================================================================
+55. KV Cache 的最佳使用位置
+======================================================================
+
+本项目有三类适合长期复用的前缀：
+
+A. System Prompt
+稳定的 Agent 身份、原则、安全规则。
+
+B. Tool Schema
+固定工具注册表。
+
+C. 当前任务稳定部分
+Goal
+Plan skeleton
+稳定世界摘要
+
+它们适合利用 LLM KV Cache / Prefix Cache。
+
+变化频繁的内容：
+Sensor Delta
+World Event
+最新用户输入
+
+尽量追加在后面。
+
+因此 Prompt 可以设计为：
+
+[Stable System Prefix]
+[Stable Tool Prefix]
+[Task Stable Context]
+-----------------------
+[Recent Delta Events]
+[Latest User Input]
+
+这样可以最大化 Prefix Cache 命中。
+
+视觉同样采用类似思想：
+
+Stable Visual Context
++
+Dynamic Visual Delta
+
+但由于视觉位置编码更复杂，
+视觉缓存需要单独的缓存管理器。
+
+======================================================================
+56. 安全与控制优先级
+======================================================================
+
+本项目是具身系统，因此必须明确控制优先级：
+
+Level 0：
+硬件安全
+过流
+过温
+限位
+急停
+电池保护
+
+Level 1：
+实时控制
+Balance
+Motor PID
+Collision Avoidance
+Emergency Stop
+
+Level 2：
+导航 / 行为规则
+Local Planner
+Obstacle Avoidance
+Speed Limit
+
+Level 3：
+LLM 指令 / Agent Planning
+
+LLM 的命令永远不能覆盖 Level 0 / Level 1。
+
+即：
+
+Safety Controller
+>
+Real-time Controller
+>
+Navigation Rules
+>
+LLM
+
+这可以保证“自我进化”不会直接破坏底层安全。
+
+======================================================================
+57. 本地算力策略：让大模型只做大模型擅长的部分
+======================================================================
+
+对于本地小模型环境，
+计算预算必须分层。
+
+低成本模块持续运行：
+
+IMU Filter
+Encoder
+EKF
+Frame Difference
+Motion Vector
+Object Tracking
+Feature Matching
+Event Bus
+
+中成本模块按需运行：
+
+Visual Encoder
+Embedding
+VLM Region Understanding
+World Model Prediction
+
+高成本模块低频运行：
+
+Main LLM
+Experience Miner
+Reflection
+LoRA Training
+
+因此架构不是：
+一个大模型包办所有功能。
+
+而是：
+确定性算法 + 小型模型 + 缓存 + 大模型高层推理
+
+这种组合反而更接近真实长期运行系统。
+
+======================================================================
+58. 推荐的工程模块进一步扩展
+======================================================================
+
+agent/
+├── cognition/
+│   ├── attention.py
+│   ├── salience.py
+│   ├── prediction_error.py
+│   └── event_router.py
+│
+├── world/
+│   ├── robot_state.py
+│   ├── world_state.py
+│   ├── world_model.py
+│   ├── scene_graph.py
+│   ├── entity.py
+│   └── coordinate_transform.py
+│
+├── vision/
+│   ├── frame_buffer.py
+│   ├── change_detector.py
+│   ├── adaptive_region.py
+│   ├── visual_feature.py
+│   ├── entity_matcher.py
+│   ├── visual_cache.py
+│   ├── vlm_adapter.py
+│   └── keyframe_store.py
+│
+├── localization/
+│   ├── imu.py
+│   ├── encoder.py
+│   ├── gps.py
+│   ├── ekf.py
+│   ├── visual_odometry.py
+│   └── factor_graph.py
+│
+├── memory/
+│   ├── working_memory.py
+│   ├── episodic_memory.py
+│   ├── experience_memory.py
+│   ├── semantic_memory.py
+│   ├── procedural_memory.py
+│   └── retrieval.py
+│
+├── experience/
+│   ├── trajectory.py
+│   ├── reward.py
+│   ├── critic.py
+│   ├── miner.py
+│   ├── conflict_resolver.py
+│   └── consolidation_gate.py
+│
+├── skill/
+│   ├── registry.py
+│   ├── router.py
+│   └── executor.py
+│
+├── model/
+│   ├── llm_runtime.py
+│   ├── kv_cache_manager.py
+│   ├── fast_weight_manager.py
+│   ├── adapter_manager.py
+│   └── model_router.py
+│
+├── training/
+│   ├── dataset_builder.py
+│   ├── replay_buffer.py
+│   ├── lora_train.py
+│   ├── evaluator.py
+│   ├── regression.py
+│   └── rollback.py
+│
+└── safety/
+    ├── watchdog.py
+    ├── permission.py
+    ├── motion_guard.py
+    └── emergency.py
+
+======================================================================
+59. 建议的评估指标
+======================================================================
+
+为了判断这个架构是否真的有价值，需要量化。
+
+A. 视觉增量效率
+Visual Cache Hit Rate
+Changed Region Ratio
+Full Re-encode Rate
+VLM Calls / Minute
+Visual Prefill Time
+TTFT
+
+B. 世界模型
+Entity Re-identification Accuracy
+World Position Error
+Off-screen Entity Persistence
+Scene Graph Consistency
+Prediction Error
+
+C. 定位
+Position Drift
+Heading Error
+GPS Correction Frequency
+Loop Closure Improvement
+
+D. Agent
+Task Success Rate
+Tool Success Rate
+Steps per Task
+Average Reward
+LLM Calls per Task
+
+E. 记忆
+Memory Retrieval Precision
+Experience Reuse Rate
+Skill Hit Rate
+Episode → Experience Conversion Rate
+
+F. 自我进化
+New Experience Gain
+Old Capability Regression
+Adapter Acceptance Rate
+Rollback Rate
+Training Cost per Accepted Update
+
+最终目标不是单纯：
+“模型回答更聪明”。
+
+而是：
+在相同本地算力下，
+任务成功率持续提高，
+重复计算持续下降，
+历史经验利用率持续上升，
+长期能力没有明显退化。
+
+======================================================================
+60. v2.1 最终完整认知闭环
+======================================================================
+
+                    REAL WORLD
+                        │
+        ┌───────────────┼────────────────┐
+        │               │                │
+      Camera           IMU           GPS/Encoder/Depth
+        │               │                │
+        └───────────────┼────────────────┘
+                        ▼
+              LOW-LEVEL PERCEPTION
+                        │
+              Sensor Fusion / EKF
+                        │
+              Ego Motion Estimation
+                        │
+                        ▼
+               DELTA PERCEPTION
+                        │
+        ┌───────────────┼────────────────┐
+        │               │                │
+      Static          Moved           New/Changed
+        │               │                │
+      Reuse        Update Pose           VLM
+        │               │                │
+        └───────────────┼────────────────┘
+                        ▼
+               PERSISTENT ENTITIES
+                        │
+                        ▼
+       GEOMETRIC + SEMANTIC WORLD STATE
+                        │
+                        ▼
+                 PREDICTIVE WORLD MODEL
+                        │
+              Prediction / Uncertainty
+                        │
+                        ▼
+          Delta + Prediction Error + Risk
+                        │
+                        ▼
+                    SALIENCE
+               /        |        \
+             Low      Medium      High
+              │         │          │
+        Update State  Memory      LLM
+                                  │
+                                  ▼
+                          Goal / Plan / Action
+                                  │
+                                  ▼
+                          Tool / Skill / Motor
+                                  │
+                                  ▼
+                             REAL RESULT
+                                  │
+                                  ▼
+                           Reward / Critic
+                                  │
+                                  ▼
+                               Episode
+                                  │
+                                  ▼
+                         Experience Mining
+                            /      |      \
+                           /       |       \
+                       Memory    Skill   Stable Experience
+                                           │
+                                           ▼
+                                  Consolidation Gate
+                                           │
+                                  Training Buffer + Replay
+                                           │
+                                           ▼
+                                        LoRA
+                                           │
+                                    Regression Test
+                                      /          \
+                                    Pass         Fail
+                                     │            │
+                                  Accept       Rollback
+                                     │
+                                     └──────────────→ NEXT WAKE CYCLE
+
+======================================================================
+61. 最终项目定位
+======================================================================
+
+这个项目最终不应该被定义为：
+
+“一个会自己微调的聊天机器人。”
+
+也不只是：
+
+“摄像头接 VLM 的机器人。”
+
+更加准确的定义是：
+
+一个低算力、本地运行、持续感知、增量建模、事件驱动、具有多时间尺度记忆和缓慢参数固化能力的具身持续学习 Agent。
+
+其核心不是追求：
+每时每刻都运行最大的模型。
+
+而是追求：
+
+已经知道的世界不重复理解；
+已经计算过的视觉尽量不重复编码；
+看不见的对象仍然存在于内部世界；
+自己移动与世界移动能够区分；
+传感器共同维护统一几何状态；
+语义模型理解“是什么和发生了什么”；
+预测模型理解“接下来可能发生什么”；
+只有有意义的变化才唤醒高层模型；
+一次经历不会马上改变模型；
+重复经历才形成经验；
+可程序化经验沉淀为 Skill；
+长期稳定经验才缓慢写入 LoRA；
+每次参数更新都必须经过验证并可以回滚。
+
+最终可以把整个项目浓缩成一句话：
+
+“只处理变化，只记住重要的，只把稳定的变成本能。”
+
+======================================================================
+62. 参考资料索引（截至 v2.1 整理时）
+======================================================================
+
+核心自进化参考：
+- Sleeping LLM — GitHub: vbario/sleeping-llm
+- KARL — GitHub: Diomandeee/karl
+- MetaClaw — GitHub: aiming-lab/MetaClaw
+- Dual-Layer Agentic Memory with Fast Write Routing and Slow Consolidation — arXiv: 2608.22215
+
+记忆/经验参考：
+- MemGPT / Letta
+- Voyager
+- MUSE
+- EvolveR
+
+视觉增量参考：
+- VLMCache — MobiSys 2026
+- STC — GitHub: lern-to-write/STC, CVPR 2026
+- EP-ViT — Encoding-prior-based cross-frame feature reuse
+- diffcua — GitHub: sdan/diffcua
+
+定位与世界几何参考方向：
+- EKF / UKF
+- Factor Graph
+- GTSAM
+- Visual Odometry
+- VIO
+- ORB-SLAM3
+- Semantic SLAM
+
+注意：
+以上参考项目不是说“已经有人完整实现了本项目所有模块”。
+目前更现实的情况是：
+不同项目分别验证了本架构中的不同关键环节。
+本项目的价值在于把这些能力组合成一条完整、长期运行、低算力、本地具身学习链路。

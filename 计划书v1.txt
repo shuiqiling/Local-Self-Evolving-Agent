@@ -1,0 +1,1370 @@
+# 本地自进化 Agent 项目计划书 v1.0
+
+## 一、项目名称
+
+**Local Evolving Agent（本地自进化智能体）**
+
+项目目标是构建一个能够长期运行、积累经验，并在经验充分沉淀后对自身模型参数产生微量影响的本地智能体系统。
+
+系统不依赖“每次任务后立即训练”，而采用类似人类长期学习的分层机制：
+
+**工作 → 记忆 → 经验 → 规律 → 固化 → 验证 → 再工作**
+
+---
+
+# 二、项目核心目标
+
+本项目希望解决普通 LLM Agent 的三个核心问题：
+
+1. 每次运行都像第一次执行任务，缺乏真正的经验积累。
+2. 大量历史内容塞入 Context 会降低推理速度并占用上下文窗口。
+3. 普通记忆系统只能让模型“查到过去”，却不能真正让长期经验逐渐影响模型本身。
+
+因此设计：
+
+```text
+短期状态
+    ↓
+Working Memory
+    ↓
+任务执行
+    ↓
+Trajectory
+    ↓
+Episodic Memory
+    ↓
+Experience Mining
+    ↓
+Stable Experience
+    ↓
+Consolidation Gate
+    ↓
+LoRA 微量训练
+    ↓
+Regression Test
+    ↓
+接受 / 回滚
+```
+
+最终实现：
+
+> 高频的新信息先存在外部记忆；只有经过多次验证、具有稳定价值的经验，才逐渐进入模型参数。
+
+---
+
+# 三、设计原则
+
+## 3.1 快学习与慢学习分离
+
+整个 Agent 采用两种学习速度。
+
+### 快系统
+
+负责：
+
+* 当前任务
+* 当前对话
+* 最近状态
+* 临时计划
+* 新产生的经历
+
+主要使用：
+
+```text
+Context
+Working Memory
+KV Cache
+Episodic Memory
+```
+
+更新频率：
+
+```text
+秒 ～ 分钟
+```
+
+---
+
+### 慢系统
+
+负责：
+
+* 稳定经验
+* 长期行为习惯
+* 任务策略
+* 技能倾向
+* 模型参数
+
+主要使用：
+
+```text
+Experience
+Skill
+LoRA
+```
+
+更新频率：
+
+```text
+小时 ～ 天 ～ 周
+```
+
+原则：
+
+**快速记忆可以频繁变化，模型参数必须缓慢变化。**
+
+---
+
+# 四、总体系统架构
+
+```text
+                      用户 / 环境
+                           │
+                           ▼
+                ┌──────────────────┐
+                │     Input        │
+                └────────┬─────────┘
+                         ▼
+                ┌──────────────────┐
+                │ Working Memory   │
+                │ Goal             │
+                │ State            │
+                │ Plan             │
+                │ Recent Action    │
+                └────────┬─────────┘
+                         │
+                    KV Cache
+                         │
+                         ▼
+                ┌──────────────────┐
+                │    Local LLM     │
+                │ Base + Adapter   │
+                └────────┬─────────┘
+                         ▼
+                ┌──────────────────┐
+                │ Planner / Agent  │
+                └────────┬─────────┘
+                         ▼
+                ┌──────────────────┐
+                │ Tools / Skills   │
+                └────────┬─────────┘
+                         ▼
+                    Environment
+                         │
+                         ▼
+                       Result
+                         │
+                  ┌──────┴──────┐
+                  ▼             ▼
+               Reward         Critic
+                  │             │
+                  └──────┬──────┘
+                         ▼
+                 Episodic Memory
+                         │
+                         ▼
+                 Experience Miner
+                         │
+                         ▼
+                 Experience Memory
+                         │
+                         ▼
+                Consolidation Gate
+                         │
+                    ┌────┴────┐
+                    │         │
+                   NO        YES
+                    │         │
+                    │         ▼
+                    │   Training Buffer
+                    │         │
+                    │         ▼
+                    │      LoRA Train
+                    │         │
+                    │         ▼
+                    │   Regression Test
+                    │         │
+                    │    ┌────┴────┐
+                    │    │         │
+                    │   PASS      FAIL
+                    │    │         │
+                    │    ▼         ▼
+                    │  Accept    Rollback
+                    │
+                    └───────────────→ 下一轮
+```
+
+---
+
+# 五、记忆系统设计
+
+整个系统采用五级记忆结构。
+
+---
+
+## L0：KV Cache
+
+作用：
+
+**计算缓存，而不是语义记忆。**
+
+用于：
+
+* System Prompt
+* Tool Schema
+* 固定 Agent Prompt
+* 当前长期保持的上下文前缀
+
+目的：
+
+降低重复 Prefill，提高首 Token 响应速度。
+
+---
+
+## L1：Working Memory
+
+保存当前任务正在使用的信息。
+
+例如：
+
+```json
+{
+  "goal": "完成当前任务",
+  "subtask": "步骤3",
+  "current_state": "...",
+  "plan": "...",
+  "last_action": "...",
+  "temporary_variables": {}
+}
+```
+
+特点：
+
+* 数量少
+* 信息密度高
+* 生命周期短
+* 当前任务结束后压缩或删除
+
+目标：
+
+避免所有历史信息进入上下文。
+
+---
+
+## L2：Episodic Memory
+
+记录：
+
+> “曾经发生过什么？”
+
+每一次重要任务形成一条 Episode。
+
+例如：
+
+```json
+{
+  "task": "...",
+  "context": "...",
+  "actions": [],
+  "tool_calls": [],
+  "result": "...",
+  "reward": 0.82,
+  "errors": [],
+  "timestamp": "..."
+}
+```
+
+这里保存的是：
+
+**经历，而不是规律。**
+
+---
+
+## L3：Experience Memory
+
+Experience Miner 定期分析 Episodic Memory。
+
+例如几十次经历中出现：
+
+```text
+A做法 → 成功率31%
+B做法 → 成功率87%
+```
+
+形成：
+
+```json
+{
+  "experience": "...",
+  "evidence_count": 31,
+  "positive_count": 26,
+  "negative_count": 5,
+  "confidence": 0.89,
+  "scope": "...",
+  "source_episodes": []
+}
+```
+
+Experience 回答的是：
+
+> “经过很多事情之后，我学到了什么？”
+
+---
+
+## L4：Parametric Memory
+
+真正进入模型参数的经验。
+
+表现形式：
+
+```text
+Base Model
++
+LoRA Adapter
+```
+
+模型实际参数：
+
+```text
+W_effective = W_base + λΔW_experience
+```
+
+其中：
+
+```text
+W_base
+```
+
+保持稳定。
+
+```text
+ΔW_experience
+```
+
+保存长期沉淀经验。
+
+λ 用于控制长期经验对模型行为的影响程度。
+
+---
+
+# 六、Agent 经验系统
+
+每个完整任务生成一个：
+
+```text
+Trajectory
+```
+
+结构：
+
+```text
+Goal
+↓
+Observation
+↓
+Thought / Plan
+↓
+Action
+↓
+Tool Call
+↓
+Environment Feedback
+↓
+New Observation
+↓
+...
+↓
+Result
+```
+
+整个轨迹进入评价系统。
+
+---
+
+# 七、评价系统
+
+评价模块不能只判断：
+
+```text
+成功 / 失败
+```
+
+建议采用多维评分。
+
+例如：
+
+```text
+Outcome
+任务是否完成
+
+Efficiency
+完成任务消耗多少步骤
+
+Correctness
+结果是否正确
+
+Tool Usage
+工具是否合理
+
+Stability
+结果是否稳定
+
+Verification
+Agent 是否验证结果
+
+Safety
+有没有出现危险操作
+
+Waste
+有没有重复、无意义尝试
+```
+
+得到综合：
+
+```text
+Reward ∈ [-1, 1]
+```
+
+或者：
+
+```text
+Score ∈ [0, 100]
+```
+
+评价结果随 Episode 一起保存。
+
+---
+
+# 八、Experience Mining
+
+Experience Miner 是整个项目最重要的模块之一。
+
+它负责：
+
+```text
+大量经历
+↓
+聚类
+↓
+比较
+↓
+寻找成功/失败差异
+↓
+提取规律
+↓
+验证规律
+↓
+形成 Experience
+```
+
+例如：
+
+```text
+Episode 01：方案A → 失败
+Episode 09：方案A → 失败
+Episode 15：方案B → 成功
+Episode 23：方案B → 成功
+Episode 31：方案B → 成功
+```
+
+最后得到：
+
+```text
+Experience:
+
+当条件 X 出现时，
+策略 B 通常优于策略 A。
+
+Confidence: 0.91
+```
+
+---
+
+# 九、经验冲突机制
+
+长期运行一定会遇到：
+
+```text
+经验A：
+X情况下应该做Y
+
+经验B：
+X情况下不应该做Y
+```
+
+不能简单删除其中一个。
+
+应该保留：
+
+```text
+Experience
+Context
+Confidence
+Evidence
+Exception
+```
+
+最终可能形成：
+
+```text
+一般情况下：
+
+X → Y
+
+但是：
+
+在 Z 条件下：
+
+X → 不应该 Y
+```
+
+也就是说系统学习的不只是：
+
+```text
+规则
+```
+
+还应该学习：
+
+```text
+规则的适用边界
+```
+
+---
+
+# 十、Consolidation Gate
+
+Experience 不能直接训练模型。
+
+必须经过固化门。
+
+建议至少检查：
+
+### 1. Evidence Count
+
+出现次数是否足够。
+
+---
+
+### 2. Confidence
+
+经验置信度是否足够。
+
+---
+
+### 3. Cross-context Validation
+
+是否在不同环境中都成立。
+
+---
+
+### 4. Contradiction
+
+有没有大量反例。
+
+---
+
+### 5. Utility
+
+这个经验是否真的值得进入参数。
+
+低频知识：
+
+```text
+放 Memory
+```
+
+高频行为经验：
+
+```text
+考虑进入 LoRA
+```
+
+---
+
+### 6. Stability
+
+经验近期是否已经稳定。
+
+---
+
+最终：
+
+```text
+Experience
+    ↓
+Gate
+    ↓
+Reject
+Delay
+Accept
+```
+
+---
+
+# 十一、训练数据生成
+
+通过 Gate 的 Experience 不直接把原文送去训练。
+
+需要转换成标准训练样本。
+
+例如：
+
+```text
+Experience
+```
+
+↓
+
+```text
+Instruction
+Input
+Good Response
+Bad Response
+Reward
+```
+
+形成：
+
+```text
+Training Buffer
+```
+
+---
+
+# 十二、Replay Buffer
+
+训练新经验的时候不能只有新数据。
+
+建议：
+
+```text
+70% 新经验
+
++
+
+30% 历史高质量经验
+```
+
+比例后续通过实验调整。
+
+目标：
+
+防止模型学习新行为之后遗忘旧能力。
+
+Replay Buffer 保存：
+
+```text
+核心能力样本
+历史经验
+通用行为样本
+关键技能样本
+```
+
+---
+
+# 十三、LoRA 微训练
+
+训练时：
+
+**禁止直接覆盖 Base Model。**
+
+采用：
+
+```text
+Base Model
++
+LoRA Adapter
+```
+
+每次训练生成：
+
+```text
+adapter_candidate_N
+```
+
+例如：
+
+```text
+adapter_v001
+adapter_v002
+adapter_v003
+```
+
+同时保存：
+
+```text
+训练数据版本
+模型版本
+评价结果
+时间
+参数
+```
+
+确保每次进化都可追踪。
+
+---
+
+# 十四、Regression Test
+
+新 Adapter 生成以后不能立即上线。
+
+必须进行：
+
+```text
+Regression Test
+```
+
+测试至少包括：
+
+### 原始能力
+
+模型原有能力是否下降。
+
+### 新经验能力
+
+是否真正学会目标经验。
+
+### 历史能力
+
+过去已经掌握的经验是否退化。
+
+### 行为偏移
+
+模型行为是否出现明显异常变化。
+
+### 输出稳定性
+
+是否产生新的重复、幻觉或异常倾向。
+
+---
+
+最终：
+
+```text
+Candidate Adapter
+       ↓
+Evaluation
+       ↓
+ ┌─────┴─────┐
+ ↓           ↓
+PASS        FAIL
+ ↓           ↓
+Accept     Rollback
+```
+
+---
+
+# 十五、权重固化等级
+
+Experience 建议分阶段进入参数：
+
+```text
+Stage 0
+纯外部记忆
+
+Stage 1
+进入 Training Buffer
+
+Stage 2
+LoRA 学习
+
+Stage 3
+经过多轮验证
+
+Stage 4
+成为稳定 Adapter
+
+Stage 5
+极少情况下 Merge
+```
+
+Base Model Merge 必须非常谨慎。
+
+项目早期：
+
+**永远不 Merge。**
+
+只使用：
+
+```text
+Base + Adapter
+```
+
+---
+
+# 十六、Skill 系统
+
+并不是所有经验都应该变成模型参数。
+
+经验可以有三种去向：
+
+```text
+                    Experience
+                        │
+          ┌─────────────┼─────────────┐
+          ▼             ▼             ▼
+
+       Memory          Skill         LoRA
+```
+
+### Memory
+
+适合：
+
+* 事实
+* 用户信息
+* 低频知识
+
+### Skill
+
+适合：
+
+* 固定工作流程
+* 工具组合
+* 可复用操作
+* 程序逻辑
+
+### LoRA
+
+适合：
+
+* 高频思维模式
+* 长期决策偏好
+* 通用行为经验
+* 稳定策略
+
+---
+
+# 十七、工具系统
+
+底层工具应该尽量由程序保证确定性。
+
+LLM 负责：
+
+```text
+判断什么时候调用
+```
+
+而不是负责：
+
+```text
+自己模拟工具
+```
+
+工具注册建议：
+
+```json
+{
+  "name": "...",
+  "description": "...",
+  "parameters": {},
+  "risk_level": 1,
+  "permission": "...",
+  "timeout": 10
+}
+```
+
+---
+
+# 十八、自我探索机制
+
+项目初期不建议让模型直接使用完整 BFS。
+
+原因：
+
+```text
+分支数太大
+↓
+大量模型调用
+↓
+CPU 推理成本过高
+```
+
+建议采用：
+
+```text
+Candidate Generation
+↓
+保留 Top-K
+↓
+执行
+↓
+Reward
+↓
+继续展开优秀路线
+```
+
+类似：
+
+```text
+Beam Search
+```
+
+但 Agent 版本应该是：
+
+```text
+Goal
+↓
+生成3个方案
+↓
+快速评分
+↓
+保留1～2个
+↓
+执行
+↓
+根据反馈调整
+```
+
+---
+
+# 十九、项目模块划分
+
+推荐代码结构：
+
+```text
+agent/
+│
+├── core/
+│   ├── agent.py
+│   ├── planner.py
+│   ├── executor.py
+│   └── state.py
+│
+├── memory/
+│   ├── working_memory.py
+│   ├── episodic_memory.py
+│   ├── experience_memory.py
+│   ├── retrieval.py
+│   └── memory_manager.py
+│
+├── experience/
+│   ├── trajectory.py
+│   ├── critic.py
+│   ├── reward.py
+│   ├── miner.py
+│   └── consolidation_gate.py
+│
+├── skill/
+│   ├── registry.py
+│   ├── skill.py
+│   └── skill_manager.py
+│
+├── tools/
+│   ├── registry.py
+│   ├── executor.py
+│   └── permissions.py
+│
+├── training/
+│   ├── dataset_builder.py
+│   ├── replay_buffer.py
+│   ├── lora_train.py
+│   ├── evaluation.py
+│   └── rollback.py
+│
+├── model/
+│   ├── model_server.py
+│   ├── kv_manager.py
+│   └── adapter_manager.py
+│
+├── storage/
+│   ├── sqlite.py
+│   └── vector_index.py
+│
+└── main.py
+```
+
+---
+
+# 二十、开发阶段规划
+
+## 第一阶段：Agent MVP
+
+目标：
+
+先让 Agent 正常工作。
+
+实现：
+
+```text
+Local LLM
+Tool Registry
+Tool Calling
+Working Memory
+Basic Agent Loop
+```
+
+暂时：
+
+```text
+不做训练
+不做自我进化
+```
+
+验收：
+
+Agent 能稳定执行任务。
+
+---
+
+# 第二阶段：经历记录系统
+
+加入：
+
+```text
+Trajectory
+Episode
+Reward
+Critic
+```
+
+实现：
+
+每次任务后保存：
+
+```text
+做了什么
+为什么做
+结果如何
+是否成功
+```
+
+验收：
+
+Agent 的行为可以完整回放。
+
+---
+
+# 第三阶段：长期记忆
+
+加入：
+
+```text
+Episodic Memory
+Vector Retrieval
+Memory Index
+```
+
+Agent 可以根据当前任务检索过去相似经历。
+
+验收：
+
+相同任务第二次执行时可以利用过去经验。
+
+---
+
+# 第四阶段：Experience Miner
+
+实现：
+
+```text
+Episodes
+↓
+聚类
+↓
+成功/失败比较
+↓
+经验抽取
+↓
+Experience Database
+```
+
+验收：
+
+Agent 能从多次任务中自动总结经验。
+
+---
+
+# 第五阶段：Skill Library
+
+把适合程序化执行的经验转化成：
+
+```text
+Skill
+```
+
+实现：
+
+```text
+Skill Create
+Skill Retrieve
+Skill Execute
+Skill Score
+Skill Update
+```
+
+验收：
+
+重复任务调用已有 Skill，而不是重新推理所有步骤。
+
+---
+
+# 第六阶段：Consolidation Gate
+
+实现稳定经验筛选。
+
+每条 Experience 拥有：
+
+```text
+confidence
+evidence_count
+success_rate
+contradiction_rate
+utility
+last_update
+```
+
+达到阈值：
+
+```text
+进入 Training Buffer
+```
+
+否则：
+
+```text
+继续观察
+```
+
+---
+
+# 第七阶段：LoRA 学习
+
+实现：
+
+```text
+Training Buffer
+↓
+Dataset Builder
+↓
+Replay
+↓
+LoRA Train
+↓
+Candidate Adapter
+```
+
+早期训练方式：
+
+**SFT 优先。**
+
+暂时不要直接上复杂强化学习。
+
+---
+
+# 第八阶段：自动验证与回滚
+
+建立：
+
+```text
+Benchmark
+Regression Test
+Adapter Version
+Rollback
+```
+
+新模型必须满足：
+
+```text
+new_score >= old_score
+```
+
+并且：
+
+```text
+core_ability_loss < threshold
+```
+
+才允许上线。
+
+---
+
+# 第九阶段：Sleep / Consolidation
+
+正常工作的时候：
+
+```text
+只推理
+只记录
+```
+
+空闲的时候：
+
+```text
+Experience Mining
+Memory Cleanup
+Training Dataset Generation
+LoRA Training
+Evaluation
+```
+
+形成：
+
+```text
+Wake
+↓
+Experience
+↓
+Sleep
+↓
+Consolidation
+↓
+Wake
+```
+
+---
+
+# 第十阶段：长期自进化
+
+最终运行循环：
+
+```text
+Agent 工作
+    ↓
+产生经历
+    ↓
+保存 Episode
+    ↓
+Experience Miner
+    ↓
+提炼经验
+    ↓
+Memory / Skill / Training 三路分流
+    ↓
+稳定经验进入 Consolidation
+    ↓
+LoRA
+    ↓
+Regression Test
+    ↓
+更新 Adapter
+    ↓
+继续工作
+    ↓
+产生新的经历
+    ↺
+```
+
+---
+
+# 二十一、开发优先级
+
+建议严格按照：
+
+```text
+Agent
+↓
+Trajectory
+↓
+Memory
+↓
+Experience
+↓
+Skill
+↓
+Gate
+↓
+Training
+↓
+Regression
+↓
+Auto Evolution
+```
+
+不要一开始就做：
+
+```text
+自动训练
+```
+
+因为：
+
+如果 Episode 数据本身不可靠，
+
+那么训练系统只会：
+
+> 自动把错误写进模型。
+
+因此整个项目真正重要的部分不是 LoRA，而是：
+
+```text
+Experience Quality
+```
+
+---
+
+# 二十二、第一版 MVP 范围
+
+第一版建议只实现：
+
+```text
+Local LLM
++
+Working Memory
++
+Tool Registry
++
+Trajectory
++
+Episodic Memory
++
+Reward
++
+Experience Miner
+```
+
+先验证：
+
+> “Agent 是否真的能够从过去的经历中提高下一次任务的成功率？”
+
+如果可以，再加入：
+
+```text
+LoRA Consolidation
+```
+
+---
+
+# 二十三、项目最终目标
+
+项目最终不是一个普通聊天机器人。
+
+而是一个长期存在的本地智能体：
+
+```text
+它工作
+↓
+它经历事情
+↓
+它记住事情
+↓
+它比较成功和失败
+↓
+它总结经验
+↓
+高频经验变成 Skill
+↓
+稳定经验逐渐影响模型参数
+↓
+新的模型继续经历事情
+↓
+继续成长
+```
+
+整个系统实现三层学习：
+
+```text
+Memory Learning
+记住发生过什么
+
+Experience Learning
+知道过去说明了什么
+
+Parameter Learning
+让稳定经验逐渐成为模型本能
+```
+
+最终设计原则可以概括成一句话：
+
+> **新信息先记住，重复经历形成经验，稳定经验才允许进入权重。**
