@@ -1,0 +1,33 @@
+# Local models and inference runtimes
+/models/
+/qwen-local/
+/runtime/
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.so
+*.dll
+*.exe
+*.zip
+
+# Runtime data, caches, private operational records and connection helpers
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/*.egg-info/
+/agent-runtime/data/
+/agent-runtime/backups/
+/agent-runtime/reports/
+/agent-runtime/deployment/wheels/
+/agent-runtime/deployment/methods/ik-build-inputs/
+**/*.log
+**/*.remote
+**/RESUME.json
+**/.env
+**/.env.*
+*.pem
+*.key

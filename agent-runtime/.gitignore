@@ -1,0 +1,10 @@
+.venv/
+data/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+deployment/bootstrap.zip
+deployment/bundle.zip
+deployment/wheels/
+deployment/tunnel.*

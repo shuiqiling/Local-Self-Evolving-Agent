@@ -1,0 +1,166 @@
+{
+  "as_of": "2026-10-29",
+  "deployment_status": "active",
+  "primary_backend": "native_kvzip",
+  "model": "Qwen3-4B-Instruct-2507-Q4_K_M",
+  "precision": "Q4_K_M",
+  "primary_adapter": "concise-v2",
+  "active_at_utc": "2026-10-29T15:44:54.579453+00:00",
+  "native_configuration": {
+    "mode": "fastkvzip",
+    "window_budget": 3072,
+    "retained_per_head": 614,
+    "protected_prefix": 64,
+    "protected_suffix": 128
+  },
+  "release_identity": "f0b02aff595a58390808a983c171baaf03f8fccb61b89ce1c45869732a3d681d",
+  "deployed_input_sha256": {
+    "native-worker": "a4d3b9e3a32f85bb442749414ab1a8112ef5299b7bdaba1e162e7c83e3b5dd60",
+    "native_worker.cpp": "342776a3e9bfd3ba7598723a7b2ca5227dd0729b7c22985b3f04c99a83085daa",
+    "backend.py": "e6020aefd84dcf792f8c80123012ec704f5801c528ca3420662bccb9d113d622",
+    "gate_server.py": "4b7225fd1657603526f53111fe853830cda3eebeff7cd68f6f008761a61474a6",
+    "gate.pt": "5b3f75dbaada8f7252a5e365262f02b5cbca9149db1f3f4cc411aaeb3dfc1368",
+    "official_gate.py": "f27e25c54c0ddacdf5b6595296753c215ecae6797e6549d0c0fd6ffcddb6f59d"
+  },
+  "runtime_sha256": {
+    "libllama.so": "77816409fd83cc56270fbd3645076f266b6a3d29de698d3ffb0ef01d6c473237",
+    "libggml-cpu.so": "73cecbf3b394d8d2c87d04c476ab780fd6e764f8f67309f201334001ba62743f"
+  },
+  "model_sha256": "73bd6b99615826ecda982673d8e033f50be91ac353abb7ae4b817594c30f59a5",
+  "adapter_sha256": "e3d6bf0070c0f5501cf059e0ba2e56cd9c05e061a5d6096c24abf52e20255e26",
+  "deployed_app_sha256": {
+    "config.py": "4c9b0229cefbd0e5f4588bab8b4dc680f8b1ab7a4468099515f6b7a9d4a41bda",
+    "model.py": "62657990919b893100bbe88c1b213e043c2827e54c3fb0eace150863232351b2",
+    "runtime.py": "71f38f0bd373582361060ad9ab920354670bc2dffecc35f2270e9d77176da588",
+    "native_kv.py": "5fdb0f52ce398261c7ce98339d3baa8a710eec540c236c275839d51c663cfe18"
+  },
+  "local_source_tests": {
+    "command": "python -m pytest -q",
+    "passed": 69,
+    "seconds": 12.81
+  },
+  "isolated_backend_checks": {
+    "request_replay_no_append": true,
+    "task_isolation": true,
+    "automatic_real_cut": true,
+    "invalid_generation_rollback": true,
+    "browser_origin_rejected": true,
+    "canceled_before_commit_rollback": true,
+    "restart_restores_kv_without_history_replay": true,
+    "corrupt_checkpoint_rejected": true
+  },
+  "isolated_agent_checks": {
+    "actual_workspace_write": true,
+    "automatic_native_handoff_in_real_agent": true,
+    "tool_read_after_cut": true,
+    "write_not_repeated": true,
+    "no_generated_summary": true,
+    "manual_handoff_without_model_forward": true,
+    "agent_and_backend_restart_resume": true
+  },
+  "formal_api_checks": {
+    "formal_actual_write": true,
+    "formal_automatic_cut": true,
+    "formal_tool_read_after_cut": true,
+    "write_not_repeated": true,
+    "no_text_summary": true,
+    "retained_kv_bitwise_equal": true,
+    "old_tokens_not_recomputed": true,
+    "formal_manual_handoff_without_generation": true
+  },
+  "formal_automatic_cuts": [
+    {
+      "after": 614,
+      "after_bytes": 90546240,
+      "attention_callbacks": 0,
+      "backup_ms": 178.028338,
+      "before": 3072,
+      "before_bytes": 453022584,
+      "cut": 1,
+      "decode_calls": 0,
+      "import_ms": 10.063212,
+      "next_absolute_position": 3072,
+      "old_tokens_recomputed": 0,
+      "pack_ms": 42.497397,
+      "retained_kv_bitwise_equal": true,
+      "seconds": 0.284548637,
+      "selection_ms": 52.626017
+    },
+    {
+      "after": 614,
+      "after_bytes": 90546240,
+      "attention_callbacks": 0,
+      "backup_ms": 178.838547,
+      "before": 3072,
+      "before_bytes": 453022584,
+      "cut": 2,
+      "decode_calls": 0,
+      "import_ms": 9.922089,
+      "next_absolute_position": 5530,
+      "old_tokens_recomputed": 0,
+      "pack_ms": 39.078333,
+      "retained_kv_bitwise_equal": true,
+      "seconds": 0.27723153899999997,
+      "selection_ms": 48.157023
+    },
+    {
+      "after": 614,
+      "after_bytes": 90546240,
+      "attention_callbacks": 0,
+      "backup_ms": 202.31259,
+      "before": 3072,
+      "before_bytes": 453022584,
+      "cut": 3,
+      "decode_calls": 0,
+      "import_ms": 12.992503,
+      "next_absolute_position": 7988,
+      "old_tokens_recomputed": 0,
+      "pack_ms": 48.597087,
+      "retained_kv_bitwise_equal": true,
+      "seconds": 0.316392618,
+      "selection_ms": 50.763142
+    }
+  ],
+  "formal_cut_seconds_median": 0.284548637,
+  "formal_manual_handoff_wall_seconds": 3.6593789550024667,
+  "measurement_limits": [
+    "Compression timing excludes new-input prefill and answer generation.",
+    "Manual wall time is one observed job, including persistence/state updates and polling, not P95.",
+    "The full semantic continuity benchmark was not repeated after deployment.",
+    "Local development source includes candidate features beyond the four-file installed overlay."
+  ],
+  "previous_ten_window_probe": {
+    "total_checks": 50,
+    "correct_checks": 34,
+    "answer_and_explanation_correct_checks": 32,
+    "all_pass_windows": 2,
+    "first_semantic_failure_window": 2,
+    "all_structural_checks_passed": true,
+    "evidence_zip_sha256": "a305d73f6715cb040b86416a2412412b6e690ef50ad5fe5921e8c6773289ba45"
+  },
+  "known_limitations": [
+    "About 20% KV retention can lose facts, negations, corrections and plans.",
+    "Passing structural and tool checks does not prove semantic reliability.",
+    "Original event archives persist but are not automatically replayed into compressed KV.",
+    "Real embodied sensors/control and automatic experience-to-parameter learning are not implemented."
+  ],
+  "earlier_staging_failures": [
+    "Repeated reads and reuse of stale results exposed insufficient current-request ledger guidance.",
+    "Tool alias read was rejected; grammar now constrains exact authorized names.",
+    "Empty final response after restart; grammar now separates final answers and actions.",
+    "Missing read path after restart; grammar now constrains required arguments by tool."
+  ],
+  "rollback": {
+    "available": true,
+    "preserves_new_events_constraints_and_operations": true,
+    "preserves_native_checkpoints": true,
+    "restores_previous_app_and_raw_record_cursor": true
+  },
+  "source_evidence_sha256": {
+    "production-smoke.json": "b5c91cd9b4d1b1e87b26ebd108432b297377971eb752e42389a43e7c7650a708",
+    "stage-backend-test-report.json": "85c4b041d47103c3264ac2337a330fb94bf07b4eb33c81dd91faa4c3edf695ed",
+    "stage-agent-test-report.json": "5e2ecf93c5ce73ceb43daaaa3227c2c35e8b7b9e43539fe9d24c6aa224f4bedc",
+    "activation.json": "d280ff431fb4e745663ce3cf542ba59ca2b1f1637bf381f11aeb7950660b80a8",
+    "release.json": "a530c33b14b57204175e09a8dba868bfc731fef1092fff1d02e581ab42d5c978"
+  }
+}
