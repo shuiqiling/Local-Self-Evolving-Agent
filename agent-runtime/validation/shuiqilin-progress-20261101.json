@@ -1,0 +1,176 @@
+{
+  "date": "2026-11-01",
+  "status": "deployed_experimental_runtime",
+  "model": {
+    "primary": "Qwen3-30B-A3B Q4_K_M",
+    "primary_lora": "light-shuiqilin-windows-20261101-170717",
+    "auxiliary_lora": "independent R17, evidence_only_v1, thinking off",
+    "embedding": "Qwen3-Embedding-0.6B F16",
+    "old_4b_and_native_kv_services": "permanently paused"
+  },
+  "architecture": {
+    "decision_agents": 1,
+    "memory_and_web_and_tool_development": "one Shuiqilin Agent",
+    "working_token_budget": 4096,
+    "backend_context_tokens": 8192,
+    "state_input": "shared chat context; attempt after10s from previous completion; actual interval depends on inference",
+    "memory_limit_bytes": 10737418240
+  },
+  "automatic_lora": {
+    "trigger_handoffs": 10,
+    "daily_attempt_limit": null,
+    "method": "CPU NF4 QLoRA; rank8 q_proj/v_proj; FP32 compute",
+    "max_optimizer_steps": 8,
+    "sequence_tokens": 512,
+    "learning_rate": 5e-06,
+    "promotion": "loadability_only; no capability regression gate",
+    "raw_archive_sft": false,
+    "telemetry_number_sft": false,
+    "kv_reset": "only after successful new-weight load, before next inference resumes",
+    "first_natural_batch_after_helper_update": {
+      "handoffs": 10,
+      "source_events": 137,
+      "train_rows": 0,
+      "model_calls": 1,
+      "helper_seconds": 14.024,
+      "outcome": "skipped_no_teacher_lessons",
+      "gradient_training_started": false,
+      "weights_activated": false
+    }
+  },
+  "helper_comparison": {
+    "cases": 14,
+    "baseline": {
+      "calls": 14,
+      "source_contract_passed": 9,
+      "mean_seconds": 13.343704409427508,
+      "median_seconds": 8.407895849988563,
+      "output_tokens": 797,
+      "input_tokens": 11612
+    },
+    "candidate": {
+      "calls": 14,
+      "source_contract_passed": 14,
+      "mean_seconds": 8.460972786926764,
+      "median_seconds": 4.456050839013187,
+      "output_tokens": 213,
+      "input_tokens": 9666
+    },
+    "mean_latency_reduction_percent": 36.59202476825721,
+    "output_token_reduction_percent": 73.27478042659975,
+    "metric": "Source contract, not general model accuracy. R2 corrects omissions with explicit source rules; not evidence of a learned weight improvement.",
+    "method": "Same loaded model and adapters, thinking off, cache_prompt=false. Baseline reused from preceding paired run; no controlled repeated timing confidence interval.",
+    "earlier_failed_candidate_preserved": true
+  },
+  "helper_validation": {
+    "unit_and_compatibility_tests": 70,
+    "actual_archived_action_rows": 4,
+    "actions": [
+      "dev.submit",
+      "dev.test",
+      "dev.publish",
+      "read_memory"
+    ],
+    "installed_API_and_source_verifier_passed": true,
+    "main_agent_capability_gain_tested": false,
+    "new_gradient_training_performed": false
+  },
+  "continuity": {
+    "mode": "source-checkpoint-v1 / r1-guarded-sources",
+    "handoff_generation_calls": 0,
+    "performance_seconds": {
+      "matched_legacy_handoff": 47.447594322031364,
+      "matched_new_handoff": 3.1863106329692528,
+      "six_case_new_median": 3.5264265470323153,
+      "installed_ten_median": 4.239304521470331,
+      "installed_ten_min": 3.084482451027725,
+      "installed_ten_max": 4.962568167014979,
+      "first_natural_production_handoff": 1.96586,
+      "six_case_answer_median": 71.24192550000001
+    },
+    "core_conclusions_correct": "6/6",
+    "core_explanations_complete": "5/6",
+    "additional_probes": "3/3",
+    "installed_handoffs": 10,
+    "limitations": [
+      "Synthetic scenarios were used during debugging; most are regression cases, not an independent general benchmark.",
+      "Memory retrieval was disabled in these task-continuity comparisons to isolate the changed path; production retrieval remains available.",
+      "The agent can still omit explanation details; preserving evidence does not guarantee correct language reasoning.",
+      "Read-only enforcement applies to explicit current-turn restrictions; it is not a universal natural-language intent classifier.",
+      "Earlier paired pilot advertised420 chars with a200-char schema. Do not use its total-answer latency as a clean production comparison."
+    ]
+  },
+  "cpu_kernel": {
+    "candidate": "candidate-moe-exact",
+    "input_gain_pct": 12.104072566647694,
+    "output_gain_pct": -0.3023745973636527,
+    "native1024_64": {
+      "candidate-moe-exact": {
+        "n": 4,
+        "input_tps": 100.80931087950322,
+        "output_tps": 12.989241503916826,
+        "seconds": 15.009589377499651
+      },
+      "reference": {
+        "n": 4,
+        "input_tps": 89.92475346475075,
+        "output_tps": 13.028636791958483,
+        "seconds": 16.264248694002163
+      }
+    },
+    "real_state": {
+      "candidate-moe-exact": {
+        "n": 2,
+        "input_tps": 95.20675948444321,
+        "output_tps": 12.816013750390596,
+        "seconds": 15.660535872986657
+      },
+      "reference": {
+        "n": 2,
+        "input_tps": 84.4072760164081,
+        "output_tps": 12.873565254720543,
+        "seconds": 17.28746907149616
+      }
+    },
+    "graph_bitwise_equal": {
+      "cases": 234,
+      "values": 927936,
+      "bitwise_equal": true,
+      "reference_sha256": "33b55afa6edff5b3f1cb21276d05d3c02266556122c682e07eaf117ea902d6b6",
+      "candidate_sha256": "33b55afa6edff5b3f1cb21276d05d3c02266556122c682e07eaf117ea902d6b6"
+    },
+    "native_tokens_equal": true,
+    "state_json_equal": true
+  },
+  "cpu_kernel_scope": "October31 benchmark with a different main adapter; not a promise of current end-to-end latency or output speed improvement",
+  "novel_reader": {
+    "status": "interrupted_not_published",
+    "tool": "novel_page",
+    "implementation_by": "Shuiqilin Agent",
+    "own_tests_passed": 1,
+    "own_tests_total": 3,
+    "independent_tests_passed": 4,
+    "independent_tests_total": 9,
+    "code_issue": "next_offset can exceed text length",
+    "runtime_error": "BudgetExceeded: Mandatory request/state is too large",
+    "completed_features": [
+      "first implementation submitted",
+      "actual self and independent tests executed"
+    ],
+    "uncompleted_features": [
+      "bug repair",
+      "publication",
+      "persistent-progress and resume demonstration",
+      "bounded file-path reading for long novels"
+    ],
+    "current_instruction": "observe only; no continuation or repair instruction sent"
+  },
+  "open_issues": [
+    "No evidence yet that repeated automatic LoRA improves main-Agent skill; loadability is not quality",
+    "Cross-batch action chains and code-repair training examples remain incomplete",
+    "More than3 receipts/prior conditions and oversized full examples remain archived pending safe splitting",
+    "Eight optimizer steps do not bound total micro-batches or wall time",
+    "Mandatory context can exceed4096 tokens even after optional-history reduction",
+    "Memory relevance thresholds are still provisional, not independently calibrated"
+  ]
+}

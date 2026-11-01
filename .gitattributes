@@ -2,3 +2,8 @@
 # Pinned deployment inputs are checked by byte-level SHA-256.
 agent-runtime/deployment/kv_service/** -text whitespace=-blank-at-eof,cr-at-eol
 agent-runtime/deployment/kv_direct/fastkvzip_chain/** -text whitespace=-blank-at-eof,cr-at-eol
+# Preserve the byte hashes recorded for the audited deployed source snapshot.
+agent-runtime/deployment/shuiqilin/20261101/** text eol=lf
+agent-runtime/deployment/shuiqilin/20261101/runtime/** -text whitespace=-blank-at-eof,cr-at-eol
+agent-runtime/deployment/shuiqilin/20261101/app/** -text whitespace=-blank-at-eof,cr-at-eol
+agent-runtime/validation/shuiqilin-progress-20261101.json text eol=lf

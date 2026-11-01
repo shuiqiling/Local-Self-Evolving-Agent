@@ -1,0 +1,1019 @@
+[
+  {
+    "id": "archived-1650",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "请开发trim_edges工具：run(arguments)读取字符串text，缺省为空字符串。仅去掉首尾空白，保留所有中间空白、连续空格、内部换行和其他字符。代码和至少3条不同自测由你自己编写，实际测试当前版本，通过才登记；最后dev.run调用text为\"  a  b  \"的输入，依据真实结果简答。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "模型意图（不是执行回执）",
+          "内容": {
+            "action": "tool",
+            "arguments": {
+              "code": "def run(arguments):\n    text = arguments.get('text', '')\n    return text.strip() if text else ''",
+              "description": "从字符串text中去掉首尾空白，保留中间所有空白、连续空格、内部换行和其他字符。",
+              "name": "trim_edges",
+              "tests": [
+                {
+                  "expected": "a  b",
+                  "input": {
+                    "text": "  a  b  "
+                  }
+                },
+                {
+                  "expected": "Hello, World!",
+                  "input": {
+                    "text": "   Hello, World!   "
+                  }
+                },
+                {
+                  "expected": "Test",
+                  "input": {
+                    "text": "   \n  Test  \n   "
+                  }
+                }
+              ]
+            },
+            "response": "",
+            "tool": "dev.submit"
+          },
+          "时间": "2026-10-30T12:10:17.269863+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录2",
+          "类型": "调用请求",
+          "内容": {
+            "arguments": {
+              "code": "def run(arguments):\n    text = arguments.get('text', '')\n    return text.strip() if text else ''",
+              "description": "从字符串text中去掉首尾空白，保留中间所有空白、连续空格、内部换行和其他字符。",
+              "name": "trim_edges",
+              "tests": [
+                {
+                  "expected": "a  b",
+                  "input": {
+                    "text": "  a  b  "
+                  }
+                },
+                {
+                  "expected": "Hello, World!",
+                  "input": {
+                    "text": "   Hello, World!   "
+                  }
+                },
+                {
+                  "expected": "Test",
+                  "input": {
+                    "text": "   \n  Test  \n   "
+                  }
+                }
+              ]
+            },
+            "operation_id": "op_e3b411489347f62bf8852ad4",
+            "tool": "dev.submit"
+          },
+          "时间": "2026-10-30T12:10:17.399991+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录3",
+          "类型": "工具回执",
+          "内容": {
+            "ok": true,
+            "operation_id": "op_e3b411489347f62bf8852ad4",
+            "tool": "dev.submit",
+            "value": {
+              "code_sha256": "dc5f2e36ec10645d19497b42e50415c50a0bde4d83e79e8513519645604a798f",
+              "name": "trim_edges",
+              "revision": "rev_64db0caae3afc919",
+              "status": "saved",
+              "tested": false
+            }
+          },
+          "时间": "2026-10-30T12:10:17.780368+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录4",
+          "类型": "工具回执",
+          "内容": {
+            "ok": true,
+            "operation_id": "op_9c99eda2bea95abd45131482",
+            "tool": "dev.test",
+            "value": {
+              "code_sha256": "dc5f2e36ec10645d19497b42e50415c50a0bde4d83e79e8513519645604a798f",
+              "fingerprint": "3dacaf0d6aaef1e8b9582838ce84287e86979c67b778c9db26a0102621b50e14",
+              "independent": {
+                "cases": [
+                  {
+                    "actual": "",
+                    "passed": true
+                  },
+                  {
+                    "actual": "",
+                    "passed": true
+                  },
+                  {
+                    "actual": "中文",
+                    "passed": true
+                  },
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "你好",
+                    "passed": true
+                  },
+                  {
+                    "actual": "line1\nline2",
+                    "passed": true
+                  },
+                  {
+                    "actual": "x\ny",
+                    "passed": true
+                  },
+                  {
+                    "actual": "**x**",
+                    "passed": true
+                  },
+                  {
+                    "actual": "",
+                    "passed": true
+                  }
+                ],
+                "passed": true,
+                "seccomp": true
+              },
+              "name": "trim_edges",
+              "own": {
+                "cases": [
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "Hello, World!",
+                    "passed": true
+                  },
+                  {
+                    "actual": "Test",
+                    "passed": true
+                  }
+                ],
+                "passed": true,
+                "seccomp": true
+              },
+              "own_failures": [],
+              "passed": true,
+              "revision": "rev_64db0caae3afc919",
+              "validation_scope": "self_and_owner_tests"
+            }
+          },
+          "时间": "2026-10-30T12:10:38.022704+00:00",
+          "归属": "本次调用"
+        }
+      ]
+    },
+    "required_results": [
+      "记录4"
+    ],
+    "origin": "archived_controlled_task_actual_execution",
+    "split": "regression"
+  },
+  {
+    "id": "archived-1656",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "请开发trim_edges工具：run(arguments)读取字符串text，缺省为空字符串。仅去掉首尾空白，保留所有中间空白、连续空格、内部换行和其他字符。代码和至少3条不同自测由你自己编写，实际测试当前版本，通过才登记；最后dev.run调用text为\"  a  b  \"的输入，依据真实结果简答。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "工具回执",
+          "内容": {
+            "ok": true,
+            "operation_id": "op_e3b411489347f62bf8852ad4",
+            "tool": "dev.submit",
+            "value": {
+              "code_sha256": "dc5f2e36ec10645d19497b42e50415c50a0bde4d83e79e8513519645604a798f",
+              "name": "trim_edges",
+              "revision": "rev_64db0caae3afc919",
+              "status": "saved",
+              "tested": false
+            }
+          },
+          "时间": "2026-10-30T12:10:17.780368+00:00",
+          "归属": "先前阶段背景（仍有效的行动前条件）"
+        },
+        {
+          "编号": "记录2",
+          "类型": "模型意图（不是执行回执）",
+          "内容": {
+            "action": "tool",
+            "arguments": {
+              "name": "trim_edges",
+              "revision": "rev_64db0caae3afc919"
+            },
+            "response": "",
+            "tool": "dev.test"
+          },
+          "时间": "2026-10-30T12:10:36.111857+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录3",
+          "类型": "调用请求",
+          "内容": {
+            "arguments": {
+              "name": "trim_edges",
+              "revision": "rev_64db0caae3afc919",
+              "test_fingerprint": "3dacaf0d6aaef1e8b9582838ce84287e86979c67b778c9db26a0102621b50e14"
+            },
+            "operation_id": "op_9c99eda2bea95abd45131482",
+            "tool": "dev.test"
+          },
+          "时间": "2026-10-30T12:10:36.169357+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录4",
+          "类型": "工具回执",
+          "内容": {
+            "ok": true,
+            "operation_id": "op_9c99eda2bea95abd45131482",
+            "tool": "dev.test",
+            "value": {
+              "code_sha256": "dc5f2e36ec10645d19497b42e50415c50a0bde4d83e79e8513519645604a798f",
+              "fingerprint": "3dacaf0d6aaef1e8b9582838ce84287e86979c67b778c9db26a0102621b50e14",
+              "independent": {
+                "cases": [
+                  {
+                    "actual": "",
+                    "passed": true
+                  },
+                  {
+                    "actual": "",
+                    "passed": true
+                  },
+                  {
+                    "actual": "中文",
+                    "passed": true
+                  },
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "你好",
+                    "passed": true
+                  },
+                  {
+                    "actual": "line1\nline2",
+                    "passed": true
+                  },
+                  {
+                    "actual": "x\ny",
+                    "passed": true
+                  },
+                  {
+                    "actual": "**x**",
+                    "passed": true
+                  },
+                  {
+                    "actual": "",
+                    "passed": true
+                  }
+                ],
+                "passed": true,
+                "seccomp": true
+              },
+              "name": "trim_edges",
+              "own": {
+                "cases": [
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "Hello, World!",
+                    "passed": true
+                  },
+                  {
+                    "actual": "Test",
+                    "passed": true
+                  }
+                ],
+                "passed": true,
+                "seccomp": true
+              },
+              "own_failures": [],
+              "passed": true,
+              "revision": "rev_64db0caae3afc919",
+              "validation_scope": "self_and_owner_tests"
+            }
+          },
+          "时间": "2026-10-30T12:10:38.022704+00:00",
+          "归属": "本次调用"
+        }
+      ]
+    },
+    "required_results": [
+      "记录4"
+    ],
+    "origin": "archived_controlled_task_actual_execution",
+    "split": "regression"
+  },
+  {
+    "id": "archived-1662",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "请开发trim_edges工具：run(arguments)读取字符串text，缺省为空字符串。仅去掉首尾空白，保留所有中间空白、连续空格、内部换行和其他字符。代码和至少3条不同自测由你自己编写，实际测试当前版本，通过才登记；最后dev.run调用text为\"  a  b  \"的输入，依据真实结果简答。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "工具回执",
+          "内容": {
+            "ok": true,
+            "operation_id": "op_e3b411489347f62bf8852ad4",
+            "tool": "dev.submit",
+            "value": {
+              "code_sha256": "dc5f2e36ec10645d19497b42e50415c50a0bde4d83e79e8513519645604a798f",
+              "name": "trim_edges",
+              "revision": "rev_64db0caae3afc919",
+              "status": "saved",
+              "tested": false
+            }
+          },
+          "时间": "2026-10-30T12:10:17.780368+00:00",
+          "归属": "先前阶段背景（仍有效的行动前条件）"
+        },
+        {
+          "编号": "记录2",
+          "类型": "工具回执",
+          "内容": {
+            "ok": true,
+            "operation_id": "op_9c99eda2bea95abd45131482",
+            "tool": "dev.test",
+            "value": {
+              "code_sha256": "dc5f2e36ec10645d19497b42e50415c50a0bde4d83e79e8513519645604a798f",
+              "fingerprint": "3dacaf0d6aaef1e8b9582838ce84287e86979c67b778c9db26a0102621b50e14",
+              "independent": {
+                "cases": [
+                  {
+                    "actual": "",
+                    "passed": true
+                  },
+                  {
+                    "actual": "",
+                    "passed": true
+                  },
+                  {
+                    "actual": "中文",
+                    "passed": true
+                  },
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "你好",
+                    "passed": true
+                  },
+                  {
+                    "actual": "line1\nline2",
+                    "passed": true
+                  },
+                  {
+                    "actual": "x\ny",
+                    "passed": true
+                  },
+                  {
+                    "actual": "**x**",
+                    "passed": true
+                  },
+                  {
+                    "actual": "",
+                    "passed": true
+                  }
+                ],
+                "passed": true,
+                "seccomp": true
+              },
+              "name": "trim_edges",
+              "own": {
+                "cases": [
+                  {
+                    "actual": "a  b",
+                    "passed": true
+                  },
+                  {
+                    "actual": "Hello, World!",
+                    "passed": true
+                  },
+                  {
+                    "actual": "Test",
+                    "passed": true
+                  }
+                ],
+                "passed": true,
+                "seccomp": true
+              },
+              "own_failures": [],
+              "passed": true,
+              "revision": "rev_64db0caae3afc919",
+              "validation_scope": "self_and_owner_tests"
+            }
+          },
+          "时间": "2026-10-30T12:10:38.022704+00:00",
+          "归属": "先前阶段背景（仍有效的行动前条件）"
+        },
+        {
+          "编号": "记录3",
+          "类型": "模型意图（不是执行回执）",
+          "内容": {
+            "action": "tool",
+            "arguments": {
+              "name": "trim_edges",
+              "revision": "rev_64db0caae3afc919"
+            },
+            "response": "",
+            "tool": "dev.publish"
+          },
+          "时间": "2026-10-30T12:11:02.818380+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录4",
+          "类型": "调用请求",
+          "内容": {
+            "arguments": {
+              "name": "trim_edges",
+              "revision": "rev_64db0caae3afc919",
+              "test_fingerprint": "3dacaf0d6aaef1e8b9582838ce84287e86979c67b778c9db26a0102621b50e14"
+            },
+            "operation_id": "op_8f34b74901cd0f036b7a6e72",
+            "tool": "dev.publish"
+          },
+          "时间": "2026-10-30T12:11:03.244437+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录5",
+          "类型": "工具回执",
+          "内容": {
+            "ok": true,
+            "operation_id": "op_8f34b74901cd0f036b7a6e72",
+            "tool": "dev.publish",
+            "value": {
+              "author": "Shuiqilin chat Agent",
+              "code_sha256": "dc5f2e36ec10645d19497b42e50415c50a0bde4d83e79e8513519645604a798f",
+              "name": "trim_edges",
+              "revision": "rev_64db0caae3afc919",
+              "status": "published",
+              "validation_scope": "self_and_owner_tests"
+            }
+          },
+          "时间": "2026-10-30T12:11:03.871109+00:00",
+          "归属": "本次调用"
+        }
+      ]
+    },
+    "required_results": [
+      "记录5"
+    ],
+    "origin": "archived_controlled_task_actual_execution",
+    "split": "regression"
+  },
+  {
+    "id": "archived-1742",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "RX-742现在通信端口是多少？先用read_memory核对更正原文，再简答。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "检索索引回执（不是原文答案）",
+          "内容": {
+            "request_id": "query_3d420209686d4e5c",
+            "question": "RX-742现在通信端口是多少？先用read_memory核对更正原文，再简答。",
+            "answer_status": "index_matches",
+            "warnings": [
+              "摘要目录尚未完全就绪，不能据空结果断言历史中不存在答案。"
+            ],
+            "memory_candidates": [
+              {
+                "card_id": "ef0516112506db9ebdfc27693df467edf4ccb6aea5e43d10814811306d141ca5",
+                "summary": "虚构测试更正：RX-742的通信端口已从19217改为19237；19217已作废，后续应使用19237。",
+                "source_types": [
+                  "user_statement"
+                ],
+                "recorded_at": "2026-10-30T07:34:26.321996+00:00"
+              },
+              {
+                "card_id": "8cdb5c81ddf784a9f14eddd7a074880e25668d57d899f0afe7299360c842023c",
+                "summary": "虚构测试记录：设备RX-742的旧通信端口是19217。",
+                "source_types": [
+                  "user_statement"
+                ],
+                "recorded_at": "2026-10-30T07:34:26.271192+00:00"
+              },
+              {
+                "card_id": "a45f8a154f639afe62e3eaf45f6dc33d58e944fecb30e58ef6abddc53b74123c",
+                "summary": "虚构测试规程：RX-742仅在温度低于45摄氏度并且盖板已关闭时允许启动。任一条件不满足都禁止启动。",
+                "source_types": [
+                  "user_statement"
+                ],
+                "recorded_at": "2026-10-30T07:34:26.482845+00:00"
+              }
+            ],
+            "scope": "只投影本次读取操作涉及的前三个索引；未复制原文答案，完整回执仍在来源中。"
+          },
+          "时间": "2026-10-30T14:14:39.735485+00:00",
+          "归属": "先前阶段背景（仍有效的行动前条件）"
+        },
+        {
+          "编号": "记录2",
+          "类型": "模型意图（不是执行回执）",
+          "内容": {
+            "action": "read_memory",
+            "arguments": {
+              "card_ids": [
+                "M1",
+                "M2",
+                "M3"
+              ],
+              "question": "RX-742现在通信端口是多少？先用read_memory核对更正原文，再简答。",
+              "request_id": "query_3d420209686d4e5c"
+            },
+            "response": "",
+            "tool": ""
+          },
+          "时间": "2026-10-30T14:15:46.229056+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录3",
+          "类型": "调用请求",
+          "内容": {
+            "card_aliases": {
+              "M1": "ef0516112506db9ebdfc27693df467edf4ccb6aea5e43d10814811306d141ca5",
+              "M2": "8cdb5c81ddf784a9f14eddd7a074880e25668d57d899f0afe7299360c842023c",
+              "M3": "a45f8a154f639afe62e3eaf45f6dc33d58e944fecb30e58ef6abddc53b74123c"
+            },
+            "request_id": "query_3d420209686d4e5c",
+            "selected_card_ids": [
+              "ef0516112506db9ebdfc27693df467edf4ccb6aea5e43d10814811306d141ca5",
+              "8cdb5c81ddf784a9f14eddd7a074880e25668d57d899f0afe7299360c842023c",
+              "a45f8a154f639afe62e3eaf45f6dc33d58e944fecb30e58ef6abddc53b74123c"
+            ]
+          },
+          "时间": "2026-10-30T14:15:46.351820+00:00",
+          "归属": "本次调用"
+        },
+        {
+          "编号": "记录4",
+          "类型": "读档回执（历史引用，不是实时观测）",
+          "内容": {
+            "request_id": "query_3d420209686d4e5c",
+            "archive_read": true,
+            "answer_status": "retrieved",
+            "warnings": [
+              "摘要目录尚未完全就绪，不能据空结果断言历史中不存在答案。"
+            ],
+            "evidence_count": 4,
+            "evidence_sources": [
+              {
+                "card_id": "ef0516112506db9ebdfc27693df467edf4ccb6aea5e43d10814811306d141ca5",
+                "event_ref": "w_d6b74c3ff0bc470c:e_bfc0719e289c41c9",
+                "source_type": "user_statement"
+              },
+              {
+                "card_id": "8cdb5c81ddf784a9f14eddd7a074880e25668d57d899f0afe7299360c842023c",
+                "event_ref": "w_d6b74c3ff0bc470c:e_bb795533ecd9407b",
+                "source_type": "user_statement"
+              },
+              {
+                "card_id": "a45f8a154f639afe62e3eaf45f6dc33d58e944fecb30e58ef6abddc53b74123c",
+                "event_ref": "w_d6b74c3ff0bc470c:e_d1d52cde4aeb4294",
+                "source_type": "user_statement"
+              },
+              {
+                "card_id": "a45f8a154f639afe62e3eaf45f6dc33d58e944fecb30e58ef6abddc53b74123c",
+                "event_ref": "w_d6b74c3ff0bc470c:e_d1d52cde4aeb4294",
+                "source_type": "user_statement"
+              }
+            ],
+            "scope": "只验证取回材料，不把引用内容当作本段执行结果。完整原文在来源中。"
+          },
+          "时间": "2026-10-30T14:15:46.571069+00:00",
+          "归属": "本次调用"
+        }
+      ]
+    },
+    "required_results": [
+      "记录4"
+    ],
+    "origin": "archived_controlled_task_actual_execution",
+    "split": "regression"
+  },
+  {
+    "id": "case-no-execution",
+    "origin": "synthetic_test_only",
+    "required_results": [],
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "受控测试要求（非真实用户经历）",
+          "内容": "记录本段测试进度；计划不等于执行。"
+        },
+        {
+          "编号": "记录1",
+          "类型": "模型意图（不是执行回执）",
+          "内容": {
+            "plan": "下一步测试v2。"
+          }
+        }
+      ]
+    },
+    "split": "regression"
+  },
+  {
+    "id": "case-failed-test",
+    "origin": "synthetic_test_only",
+    "required_results": [
+      "记录2"
+    ],
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "受控测试要求（非真实用户经历）",
+          "内容": "测试当前v2版本，未通过不得发布。"
+        },
+        {
+          "编号": "记录1",
+          "类型": "调用请求",
+          "内容": {
+            "tool": "dev.test",
+            "arguments": {
+              "name": "parser",
+              "revision": "v2"
+            }
+          }
+        },
+        {
+          "编号": "记录2",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "dev.test",
+            "ok": true,
+            "value": {
+              "revision": "v2",
+              "passed": false,
+              "passed_cases": 8,
+              "failed_cases": 4
+            }
+          }
+        }
+      ]
+    },
+    "split": "regression"
+  },
+  {
+    "id": "case-empty-page",
+    "origin": "synthetic_test_only",
+    "required_results": [
+      "记录1"
+    ],
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "受控测试要求（非真实用户经历）",
+          "内容": "读取网页正文，不能用HTTP成功替代已取得正文。"
+        },
+        {
+          "编号": "记录1",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "web.open",
+            "ok": true,
+            "value": {
+              "http_status": 200,
+              "retrieved": false,
+              "text": "",
+              "error_kind": "verification_required"
+            }
+          }
+        }
+      ]
+    },
+    "split": "regression"
+  },
+  {
+    "id": "case-state-units",
+    "origin": "synthetic_test_only",
+    "required_results": [
+      "记录1"
+    ],
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "受控测试要求（非真实用户经历）",
+          "内容": "记录这次采样。磁盘与记忆额度是两个指标；缺测不是零，接口流量不是可用网速。"
+        },
+        {
+          "编号": "记录1",
+          "类型": "观测",
+          "内容": {
+            "sample_time": "2026-11-01T00:00:00Z",
+            "cpu_temperature_c": null,
+            "disk_used_percent": 57,
+            "memory_store_quota_used_percent": 89,
+            "rx_mib_per_second": 0,
+            "bandwidth_capacity_mbps": null
+          }
+        }
+      ]
+    },
+    "split": "regression"
+  },
+  {
+    "id": "holdout-version-failure",
+    "split": "heldout",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "只能发布当前v9通过全部独立测试的版本。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "dev.test",
+            "version": "v8",
+            "passed": true,
+            "cases": 12
+          },
+          "归属": "先前阶段背景（仍有效的行动前条件）"
+        },
+        {
+          "编号": "记录2",
+          "类型": "模型意图（不是执行回执）",
+          "内容": {
+            "plan": "v9应该也通过了，准备发布"
+          }
+        },
+        {
+          "编号": "记录3",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "dev.test",
+            "version": "v9",
+            "passed": false,
+            "passed_cases": 10,
+            "failed_cases": 2
+          }
+        }
+      ]
+    },
+    "required_results": [
+      "记录3"
+    ],
+    "required_conditions": [
+      "记录1"
+    ]
+  },
+  {
+    "id": "holdout-correction",
+    "split": "heldout",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "核对当前端口，不要连接设备。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "用户声明",
+          "内容": {
+            "旧端口": 36214,
+            "新端口": 45109,
+            "旧值作废": true
+          },
+          "归属": "先前阶段背景（仍有效的行动前条件）"
+        },
+        {
+          "编号": "记录2",
+          "类型": "读档回执（历史引用，不是实时观测）",
+          "内容": {
+            "tool": "memory.read",
+            "retrieved": true,
+            "quote": "端口45109，仅维护模式使用",
+            "connection_test": null
+          }
+        }
+      ]
+    },
+    "required_results": [
+      "记录2"
+    ],
+    "required_conditions": [
+      "记录1"
+    ]
+  },
+  {
+    "id": "holdout-dedup",
+    "split": "heldout",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "保存一次配置，重复请求不能造成第二次写入。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "config.save",
+            "operation_id": "op-z3",
+            "ok": true,
+            "writes": 1
+          }
+        },
+        {
+          "编号": "记录2",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "config.save",
+            "operation_id": "op-z3",
+            "ok": true,
+            "deduplicated": true,
+            "new_writes": 0
+          }
+        }
+      ]
+    },
+    "required_results": [
+      "记录1",
+      "记录2"
+    ],
+    "required_conditions": []
+  },
+  {
+    "id": "holdout-no-result",
+    "split": "heldout",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "查询节点是否可用，不要修改配置。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "调用请求",
+          "内容": {
+            "tool": "net.probe",
+            "node": "blue-17"
+          }
+        },
+        {
+          "编号": "记录2",
+          "类型": "模型已输出的说法（不能替代操作回执）",
+          "内容": "节点应该在线，查询成功。"
+        }
+      ]
+    },
+    "required_results": [],
+    "required_conditions": []
+  },
+  {
+    "id": "holdout-search-vs-read",
+    "split": "heldout",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "搜索文档并读正文后再回答；搜索候选不算读过。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "web.search",
+            "retrieved": true,
+            "results": [
+              {
+                "url": "https://example.org/manual",
+                "title": "Manual"
+              }
+            ]
+          }
+        },
+        {
+          "编号": "记录2",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "web.open",
+            "url": "https://example.org/manual",
+            "retrieved": false,
+            "http_status": 200,
+            "text": "",
+            "error": "challenge"
+          }
+        }
+      ]
+    },
+    "required_results": [
+      "记录1",
+      "记录2"
+    ],
+    "required_conditions": []
+  },
+  {
+    "id": "holdout-zero-false-null",
+    "split": "heldout",
+    "input": {
+      "原始记录": [
+        {
+          "编号": "用户要求",
+          "类型": "用户原文",
+          "内容": {
+            "text": "如实记录各项回执，不能将零、false、缺测混为执行失败。"
+          }
+        },
+        {
+          "编号": "记录1",
+          "类型": "工具回执",
+          "内容": {
+            "tool": "sensor.read",
+            "ok": true,
+            "count": 0,
+            "door_closed": false,
+            "temperature_c": null
+          }
+        },
+        {
+          "编号": "记录2",
+          "类型": "模型已输出的说法（不能替代操作回执）",
+          "内容": "全部失败，温度太高。"
+        }
+      ]
+    },
+    "required_results": [
+      "记录1"
+    ],
+    "required_conditions": []
+  }
+]
