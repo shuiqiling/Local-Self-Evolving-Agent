@@ -1,0 +1,460 @@
+{
+  "date": "2026-11-02",
+  "scope": "Published current deployed source and bounded evidence summaries; raw private records omitted",
+  "deployment": {
+    "observed_at_utc": "2026-11-02T03:48:37Z",
+    "profile": {
+      "name": "水麒麟",
+      "model": "Qwen3-30B-A3B-Q4_K_M",
+      "primary_adapter": "light-shuiqilin-windows-20261102-011521",
+      "idle_activity": {
+        "version": "idle-development-v1",
+        "session_enabled": true,
+        "activity_budget_seconds": 300,
+        "max_consecutive_no_progress": 2,
+        "development_enabled": true,
+        "development_output_tokens": 1536
+      },
+      "memory_lookup": {
+        "version": "active-memory-pages-v1",
+        "automatic_query": false,
+        "page_size": 3,
+        "tools": [
+          "memory.search",
+          "memory.next",
+          "memory.read"
+        ]
+      },
+      "automatic_lora_window_interval": 10,
+      "memory_capacity": {
+        "enabled": true,
+        "hard_enforced": true,
+        "limit_gib": 10.0,
+        "full_policy": "stop_new_writes_preserve_existing"
+      }
+    },
+    "services": {
+      "lea-shuiqilin": "active",
+      "lea-shuiqilin-idle-state": "active",
+      "lea-shuiqilin-autolora": "active",
+      "lea-qwen30b-trial": "active",
+      "lea-embedding": "active"
+    }
+  },
+  "program_checks": {
+    "source_files_verified": 78,
+    "suites": [
+      {
+        "suite": "check_opt.py",
+        "exit_code": 0,
+        "passed": 20,
+        "known_expected_failures": 0,
+        "sqlite_resource_warnings": false
+      },
+      {
+        "suite": "check_behavior.py",
+        "exit_code": 0,
+        "passed": 27,
+        "known_expected_failures": 0,
+        "sqlite_resource_warnings": false
+      },
+      {
+        "suite": "check_auto_integration.py",
+        "exit_code": 0,
+        "passed": 15,
+        "known_expected_failures": 0,
+        "sqlite_resource_warnings": false
+      },
+      {
+        "suite": "check_reset.py",
+        "exit_code": 0,
+        "passed": 8,
+        "known_expected_failures": 0,
+        "sqlite_resource_warnings": false
+      },
+      {
+        "suite": "test_development.py",
+        "exit_code": 0,
+        "passed": 10,
+        "known_expected_failures": 0,
+        "sqlite_resource_warnings": true
+      },
+      {
+        "suite": "test_sessions.py",
+        "exit_code": 0,
+        "passed": 15,
+        "known_expected_failures": 0,
+        "sqlite_resource_warnings": true
+      },
+      {
+        "suite": "test_idle_regression.py",
+        "exit_code": 0,
+        "passed": 14,
+        "known_expected_failures": 0,
+        "sqlite_resource_warnings": true
+      },
+      {
+        "suite": "test_active_memory.py",
+        "exit_code": 0,
+        "passed": 15,
+        "known_expected_failures": 0,
+        "sqlite_resource_warnings": true
+      },
+      {
+        "suite": "test_continuity.py",
+        "exit_code": 0,
+        "passed": 38,
+        "known_expected_failures": 1,
+        "sqlite_resource_warnings": false
+      }
+    ],
+    "passed": 162,
+    "known_expected_failures": 1,
+    "model_called": false,
+    "network_used": false,
+    "known_defect": "The deployed antecedent matcher misses '第二种'; its strict xfail is not a passed case."
+  },
+  "source_manifest_sha256": "22d09664d6e2977d46791ade98e2c8c49dc8207a0df5a4049ddd4591a43fc1a1",
+  "memory_history_index": {
+    "unique_sources": 329,
+    "source_records": 1025,
+    "retrieval_fragments": 3689,
+    "original_sources_unchanged": true,
+    "failed_sources": 0,
+    "elapsed_seconds": 927.7,
+    "all_sources_have_helper_inference_evidence": true
+  },
+  "active_memory": {
+    "memory": {
+      "version": "active-memory-pages-v1",
+      "automatic_query": false,
+      "page_size": 3,
+      "tools": [
+        "memory.search",
+        "memory.next",
+        "memory.read"
+      ]
+    },
+    "fixed_request_replay": {
+      "old_input_tokens": 4072,
+      "new_input_tokens": 1548,
+      "headroom_tokens": 2548,
+      "working_tokens": 4096,
+      "snapshot_sha256": "aead5b78d765cf6a7b1cdaa23a383ac4f4d3b2d5d01ef7916e7731bd0545f81a",
+      "constraints_and_current_cpu_preserved": true,
+      "model_generations": 0
+    },
+    "tests": {
+      "ubuntu_active_memory": 15,
+      "ubuntu_prior_autonomy_regressions": 14,
+      "total": 29,
+      "additional_parameter_cases": 9,
+      "local_same_suites_passed": true
+    },
+    "preserved": {
+      "idle_wait_after_response_seconds": 10,
+      "lora_real_handoffs_per_batch": 10,
+      "memory_cap_gib": 10,
+      "main_and_helper_weights_unchanged_by_deployment": true,
+      "training_cursor_unchanged_by_deployment": true,
+      "shared_chat_state_archive": true,
+      "source_records_retained": true,
+      "backend_not_restarted_for_deployment": true
+    },
+    "limits": [
+      "Candidate scores are relevance scores, not calibrated answer probabilities",
+      "One fixed token replay and small real-model checks; not general accuracy or a matched latency/TPS benchmark",
+      "Paged search has at most 80 candidates from existing vector+keyword pool; user can refine query when exhausted",
+      "Reduced prompt size may reduce idle handoffs; only real committed handoffs count toward automatic LoRA"
+    ]
+  },
+  "bounded_execution": {
+    "policy": {
+      "version": "resumable-execution-v3",
+      "slice_steps": 16,
+      "max_automatic_steps": 64,
+      "normal_input_tokens": 4096,
+      "max_temporary_input_tokens": 6144,
+      "max_output_recovery_tokens": 1536,
+      "checkpoint_resume": true,
+      "repeated_no_progress_decisions": 3,
+      "limits_result": "paused_with_checkpoint",
+      "automatic_slice_continuation_requires_progress": true
+    },
+    "replay": {
+      "baseline_precheck_tokens": 4236,
+      "baseline_actual_tokens": 4380,
+      "candidate_precheck_and_actual_tokens": 4035,
+      "normal_budget": 4096,
+      "bounded_recovery_budget": 6144,
+      "actual_development_environment_included": true,
+      "latest_receipt_request_constraints_unchanged": true,
+      "limits": "Frozen prompt replay; task outcomes require actual execution and receipts."
+    }
+  },
+  "idle_sessions": {
+    "activity_budget_seconds": 300,
+    "max_consecutive_no_progress": 2,
+    "max_tools_per_decision": 1,
+    "fixed_max_actions_per_activity": null,
+    "idle_delay_after_activity_seconds": 10,
+    "tests_passed": 44,
+    "real_model_cases": [
+      {
+        "name": "multi-step",
+        "seconds": 167.671,
+        "stop_reason": "goal_complete",
+        "decisions": 3,
+        "actions": 2,
+        "tools": [
+          "workspace.read",
+          "workspace.write"
+        ],
+        "all_tool_receipts_ok": true,
+        "model_call_seconds": [
+          46.524,
+          52.331,
+          62.04
+        ],
+        "scope": "Guided isolated goal, actual model decisions and tools; not a general autonomous capability score.",
+        "readback_mode": "actual_write_tool_readback"
+      },
+      {
+        "name": "foreground",
+        "seconds": 3.002,
+        "stop_reason": "preempted_by_foreground_activity",
+        "decisions": 0,
+        "actions": 0,
+        "tools": [],
+        "all_tool_receipts_ok": true,
+        "model_call_seconds": [
+          1.347
+        ],
+        "yield_after_trigger_seconds": 0.463,
+        "real_inference_cancelled": true,
+        "injected_signal": "foreground"
+      },
+      {
+        "name": "training",
+        "seconds": 2.985,
+        "stop_reason": "yielding_to_lora",
+        "decisions": 0,
+        "actions": 0,
+        "tools": [],
+        "all_tool_receipts_ok": true,
+        "model_call_seconds": [
+          1.51
+        ],
+        "yield_after_trigger_seconds": 0.609,
+        "real_inference_cancelled": true,
+        "injected_signal": "training"
+      }
+    ],
+    "limits": [
+      "Goal completion is the model judgment with source-checked current-activity receipt references, not independent acceptance.",
+      "Time budget stops new work/cancels inference; an admitted tool drains its bounded operation and archives its receipt before release.",
+      "Preemption tests injected priority signals in an isolated archive; real model inference was cancelled, no actual training started.",
+      "The concrete multi-step goal was provided for acceptance; not an unprompted autonomous quality or TPS benchmark."
+    ]
+  },
+  "idle_development": {
+    "interfaces": [
+      "dev.list",
+      "dev.submit",
+      "dev.test",
+      "dev.publish",
+      "dev.run"
+    ],
+    "tests_passed": 54,
+    "autonomous_creation_observed": true,
+    "interface_proven": true,
+    "weights_unchanged": true,
+    "test_design_note": "Round 1 omitted the output container format. Its correct transformed data was wrapped in an object, conflicting with the frozen bare-array contract. The model changed self-tests but did not repair that format; publication stayed blocked. Round 1 was interrupted and preserved. The separately reported round 2 explicitly specifies a bare array, uses fresh isolated memory, and still does not explicitly ask for tool development.",
+    "duplicate_actions_suppressed": 2,
+    "training_started_by_this_work": false,
+    "production_memory_written_by_pilot": false,
+    "runtime_fingerprint": "5a76e1821ff75d45b907be813e035f26362fd75635e9d62c91bf90e9ae300093",
+    "limits": [
+      "Idle actions remain limited by task tool permissions and current constraints.",
+      "New tools are pure Python JSON-to-JSON; no host filesystem/network/process access; publication is local.",
+      "Current revision and bound tests must pass before publishing. Self-tests only are labelled; they do not prove general correctness.",
+      "The recognition goal omits explicit development requests, but the shared policy suggests reusable tools for repeated work.",
+      "One recurring-work example is not a general spontaneous-planning success rate; no before/after speedup benchmark was performed.",
+      "After successful use, the model requested the identical run twice. Both were suppressed and the no-progress rule ended the activity; independent self-termination was not demonstrated.",
+      "Five-minute activities may persist a draft and continue in a later activity; user/training preemption remains enabled."
+    ],
+    "real_model_cases": [
+      {
+        "name": "recognize",
+        "seconds": 562.136,
+        "attempted_creation": true,
+        "full_pipeline_success": true,
+        "tools": [
+          "dev.submit",
+          "dev.test",
+          "dev.publish",
+          "dev.run"
+        ],
+        "acceptance": [
+          {
+            "name": "process_labels",
+            "revision": "rev_61efb2417a4fbfa0",
+            "passed": true,
+            "used_on_goal_batch": true,
+            "cases": [
+              {
+                "passed": true,
+                "actual": [
+                  "beta",
+                  "alpha",
+                  "gamma"
+                ]
+              },
+              {
+                "passed": true,
+                "actual": [
+                  "b",
+                  "a"
+                ]
+              },
+              {
+                "passed": true,
+                "actual": []
+              },
+              {
+                "passed": true,
+                "actual": [
+                  "中文",
+                  "x"
+                ]
+              },
+              {
+                "passed": true,
+                "actual": [
+                  "a",
+                  "b"
+                ]
+              }
+            ],
+            "code_sha256": "f389c6c8dfd4f33daea675e3273533ef8e0aa4c0be2f5f0d0980334891809242",
+            "model_authored_code": "def run(arguments):\n    labels = arguments.get('labels', [])\n    processed = []\n    seen = set()\n    for label in labels:\n        cleaned = label.strip().lower()\n        if cleaned and cleaned not in seen:\n            processed.append(cleaned)\n            seen.add(cleaned)\n    return processed"
+          }
+        ],
+        "session_stops": [
+          "time_budget",
+          "consecutive_no_progress"
+        ],
+        "model_calls": 7,
+        "model_seconds": [
+          76.816,
+          69.284,
+          72.699,
+          72.332,
+          77.286,
+          85.473,
+          82.416
+        ],
+        "seconds_to_first_successful_use": 389.449,
+        "model_recognized_completion": false,
+        "test_cases_frozen_before_generation": true,
+        "scope": "Recurring-task goal; generic reusable-tool policy in system prompt; isolated data and local publication."
+      }
+    ]
+  },
+  "observed_write_receipts": {
+    "comparison": {
+      "old_model_calls": 2,
+      "new_model_calls": 1,
+      "old_total_seconds": 80.60594934195979,
+      "new_total_seconds": 34.98144152999157,
+      "total_reduction_percent": 56.6,
+      "old_post_write_seconds": 39.2232,
+      "new_post_write_seconds": 0.671941,
+      "scope": "same isolated write request: retained correct old run versus new run; no memory retrieval"
+    },
+    "tests": {
+      "local": {
+        "passed": 138,
+        "subtests": 8,
+        "seconds": 16.09
+      },
+      "ubuntu": {
+        "passed": 24,
+        "seconds": 85.478
+      }
+    },
+    "failed_trial_count": 3,
+    "limits": [
+      "Retained old successful run versus a new run, not a fresh back-to-back pair; failures were retained. No P95 or sustained TPS conclusion.",
+      "The faster result is due to one avoided model call, not faster model kernels.",
+      "Semantic correctness of authored contents is not verified; the novel document omissions remain.",
+      "Analysis and multi-step tasks retain model-generated replies; their hallucination risk is not eliminated."
+    ]
+  },
+  "state_view": {
+    "cases": [
+      {
+        "variant": "baseline",
+        "input_tokens": 3992,
+        "seconds": 96.00281213899143
+      },
+      {
+        "variant": "candidate",
+        "input_tokens": 3699,
+        "seconds": 87.74490411602892
+      }
+    ],
+    "scope": "One frozen case; old candidate incorrectly selected historical/external-sensor temperature; corrected case reads current CPU 29 C. No general accuracy or TPS claim.",
+    "failed_first_candidate_preserved": true
+  },
+  "receipt_reporting": {
+    "old_prompt_tokens": 4478,
+    "new_prompt_tokens": 4206,
+    "old_cold_prefill_seconds": 61.27,
+    "new_cold_prefill_seconds": 59.41,
+    "scope": "One controlled cold prompt comparison; not sustained TPS."
+  },
+  "novel_reader": {
+    "published": true,
+    "revision": "rev_dfda6ae06c8b4bdf",
+    "selftests_passed": 3,
+    "selftests_total": 3,
+    "independent_passed": 9,
+    "independent_total": 9,
+    "guided_receipts_verified": true,
+    "page_offsets": [
+      0,
+      4,
+      8,
+      12
+    ],
+    "saved_and_read_back_offset": 8,
+    "full_document_content_acceptance_passed": false,
+    "large_txt_host_reader_implemented": false,
+    "scope": "Model authored repair; use/save/resume acceptance guided, not unaided autonomy."
+  },
+  "known_limits": [
+    "Tool development demonstrated once under a reusable-tool policy, not a general success rate or measured speedup.",
+    "Model repeated a completed dev.run twice; both suppressed and the no-progress rule stopped the activity.",
+    "The deployed antecedent matcher misses 第二种; one strict xfail records this unfixed defect.",
+    "New LoRA uses loadability-only promotion; no complete capability regression gate.",
+    "Some Python 3.13 program checks warn about unclosed SQLite connections.",
+    "Current UI retains some historical labels; the model profile and this report identify the deployed 30B.",
+    "The published source needs machine-specific runtime dependencies and configuration; weights and private state are excluded."
+  ],
+  "local_source_report_sha256": {
+    "memory-history-index-20261101": "2943feac2e8809d9829101572d8eb36ffe1d6edaecf74e341dc6154a25cfafba",
+    "memory-navigation-20261101": "9037f319d6ea7d6229be48d1cc59bb71988774c984b99ee55acefb0b70a6c819",
+    "execution-recovery-20261101": "394f9b57ea98b046047539af733f3ad4a4f106c7d04d57702b7ac2643fb09623",
+    "observation-health-20261101": "5937297ae20d5c39c50aa62b4e967785b0cca3ff8a84028e1f4353c759f84e77",
+    "receipt-reporting-20261101": "97b935aa7c157458c30f3d5d3831338a7b3e54104430f00b955c7a42df1cf26e",
+    "runtime-optimization-20261101": "23f6ed11405bff266183717f0b3da469262069ebf30f1ec43f3020ca2c2d0c46",
+    "write-receipts-20261102": "1b923ace1e2e28dfae1a44e0043be971648ee1da1658ed461d218274461bea8f",
+    "state-view-20261102": "b5bcdf7011490d6494b3d684edba3a710bc7ca9534a8ee2eb09ef128b8d05bb3",
+    "idle-budget-20261102": "45f0713cd89575ed7e9c72a678a5a6c95a47402c7804e52cb3380f4c3b9a2743",
+    "active-memory-20261102": "383ed43568f35e76c600a6186dc22073a5c64441caba919a5f308eec203b0f0c",
+    "idle-autonomy-20261102": "c150226b797173c9f4a7a4e3aa1355fa51fa393a4bdf7887274443f38c775d84",
+    "idle-sessions-20261102": "157a474f8fa181b5a5f45e9c0006bcec952dffefc1f4f829a9dd1d3ed937517f",
+    "idle-development-20261102": "a945d2d875c445dc711550ccc6008cb5494bd488597e3088337967822d9cfe1c"
+  }
+}

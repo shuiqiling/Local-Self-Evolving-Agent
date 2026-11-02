@@ -1,0 +1,73 @@
+{
+  "source_files_verified": 78,
+  "suites": [
+    {
+      "suite": "check_opt.py",
+      "exit_code": 0,
+      "passed": 20,
+      "known_expected_failures": 0,
+      "sqlite_resource_warnings": false
+    },
+    {
+      "suite": "check_behavior.py",
+      "exit_code": 0,
+      "passed": 27,
+      "known_expected_failures": 0,
+      "sqlite_resource_warnings": false
+    },
+    {
+      "suite": "check_auto_integration.py",
+      "exit_code": 0,
+      "passed": 15,
+      "known_expected_failures": 0,
+      "sqlite_resource_warnings": false
+    },
+    {
+      "suite": "check_reset.py",
+      "exit_code": 0,
+      "passed": 8,
+      "known_expected_failures": 0,
+      "sqlite_resource_warnings": false
+    },
+    {
+      "suite": "test_development.py",
+      "exit_code": 0,
+      "passed": 10,
+      "known_expected_failures": 0,
+      "sqlite_resource_warnings": true
+    },
+    {
+      "suite": "test_sessions.py",
+      "exit_code": 0,
+      "passed": 15,
+      "known_expected_failures": 0,
+      "sqlite_resource_warnings": true
+    },
+    {
+      "suite": "test_idle_regression.py",
+      "exit_code": 0,
+      "passed": 14,
+      "known_expected_failures": 0,
+      "sqlite_resource_warnings": true
+    },
+    {
+      "suite": "test_active_memory.py",
+      "exit_code": 0,
+      "passed": 15,
+      "known_expected_failures": 0,
+      "sqlite_resource_warnings": true
+    },
+    {
+      "suite": "test_continuity.py",
+      "exit_code": 0,
+      "passed": 38,
+      "known_expected_failures": 1,
+      "sqlite_resource_warnings": false
+    }
+  ],
+  "passed": 162,
+  "known_expected_failures": 1,
+  "model_called": false,
+  "network_used": false,
+  "known_defect": "The deployed antecedent matcher misses '第二种'; its strict xfail is not a passed case."
+}

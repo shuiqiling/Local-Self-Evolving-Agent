@@ -7,3 +7,7 @@ agent-runtime/deployment/shuiqilin/20261101/** text eol=lf
 agent-runtime/deployment/shuiqilin/20261101/runtime/** -text whitespace=-blank-at-eof,cr-at-eol
 agent-runtime/deployment/shuiqilin/20261101/app/** -text whitespace=-blank-at-eof,cr-at-eol
 agent-runtime/validation/shuiqilin-progress-20261101.json text eol=lf
+agent-runtime/deployment/shuiqilin/20261102/** text eol=lf
+agent-runtime/deployment/shuiqilin/20261102/runtime/** -text whitespace=-blank-at-eof,cr-at-eol
+agent-runtime/deployment/shuiqilin/20261102/app/** -text whitespace=-blank-at-eof,cr-at-eol
+agent-runtime/validation/shuiqilin-progress-20261102.json text eol=lf

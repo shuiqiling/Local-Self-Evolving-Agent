@@ -1,0 +1,40 @@
+{
+  "observed_at_utc": "2026-11-02T03:48:37Z",
+  "profile": {
+    "name": "水麒麟",
+    "model": "Qwen3-30B-A3B-Q4_K_M",
+    "primary_adapter": "light-shuiqilin-windows-20261102-011521",
+    "idle_activity": {
+      "version": "idle-development-v1",
+      "session_enabled": true,
+      "activity_budget_seconds": 300,
+      "max_consecutive_no_progress": 2,
+      "development_enabled": true,
+      "development_output_tokens": 1536
+    },
+    "memory_lookup": {
+      "version": "active-memory-pages-v1",
+      "automatic_query": false,
+      "page_size": 3,
+      "tools": [
+        "memory.search",
+        "memory.next",
+        "memory.read"
+      ]
+    },
+    "automatic_lora_window_interval": 10,
+    "memory_capacity": {
+      "enabled": true,
+      "hard_enforced": true,
+      "limit_gib": 10.0,
+      "full_policy": "stop_new_writes_preserve_existing"
+    }
+  },
+  "services": {
+    "lea-shuiqilin": "active",
+    "lea-shuiqilin-idle-state": "active",
+    "lea-shuiqilin-autolora": "active",
+    "lea-qwen30b-trial": "active",
+    "lea-embedding": "active"
+  }
+}
